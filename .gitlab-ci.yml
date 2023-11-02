@@ -1,0 +1,47 @@
+image: ruby:2.7
+
+cache:
+  paths:
+  - vendor
+
+test:
+  script:
+  - apt-get update -yqqq
+  - curl -sL https://deb.nodesource.com/setup_18.x | bash -
+  - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+  - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+  - apt update
+  - apt-get install -y nodejs yarn
+  - export GEM_HOME=$PWD/gems
+  - export PATH=$PWD/gems/bin:$PATH
+  - gem install bundler
+  - gem install activesupport -v 6.1.7
+  - gem install bridgetown -N
+  - bundle install
+  - yarn install
+  - bin/bridgetown deploy
+  - bin/bridgetown clean
+  except:
+    - main
+
+pages:
+  script:
+  - apt-get update -yqqq
+  - curl -sL https://deb.nodesource.com/setup_18.x | bash -
+  - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+  - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+  - apt update
+  - apt-get install -y nodejs yarn
+  - export GEM_HOME=$PWD/gems
+  - export PATH=$PWD/gems/bin:$PATH
+  - gem install bundler
+  - gem install bridgetown -N
+  - bundle install
+  - yarn install
+  - bin/bridgetown deploy
+  - mv output public
+  artifacts:
+    paths:
+    - public
+  only:
+  - main
