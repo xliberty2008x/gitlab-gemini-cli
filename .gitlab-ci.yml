@@ -1,63 +1,53 @@
-stages: [ai_review]
-
 ai-gemini-review:
   stage: ai_review
   tags: [ai]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  variables:
-    GEMINI_PROMPT: |
-      You are a senior reviewer for a Unity/C# project.
-      1) Use GitLab MCP tools to read THIS MR’s changes and intent.
-      2) Post ONE concise summary comment with top risks (correctness, performance, security, CI/Unity pitfalls).
-      3) Post ONE suggestions comment with safe GitLab suggestions.
-    GEMINI_CLI_VERSION: "latest"
-    GOOGLE_GENAI_USE_VERTEXAI: "false"
-    GOOGLE_GENAI_USE_GCA: "false"
   before_script:
+    - set -euo pipefail
     - export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
     - command -v npm || ( brew update && brew install -q node )
-    - npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
-    - test -n "$GEMINI_API_KEY" || { echo "❌ GEMINI_API_KEY missing"; exit 1; }
-    - test -n "$GITLAB_REVIEW_PAT" || { echo "❌ GITLAB_REVIEW_PAT missing"; exit 1; }
-
-    # Install the correct MCP binary for macOS Apple Silicon
+    - npm install -g @google/gemini-cli
     - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
     - export GITLAB_MCP_VERSION="1.29.0"
-    - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" \
-        "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Darwin_arm64.tar.gz"
+    # ✅ CORRECT BINARY FOR MAC ARM:
+    - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Darwin_arm64.tar.gz"
     - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
     - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
-
-    # Combine optional .gemini/settings.json from “settings” input + MCP server
     - |
-      mkdir -p "$HOME/.gemini"
-      if [ -n "${GEMINI_SETTINGS_JSON}" ]; then
-        echo "${GEMINI_SETTINGS_JSON}" > "$HOME/.gemini/settings.json"
-      else
-        cat > "$HOME/.gemini/settings.json" <<'JSON'
-        {
-          "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
-          "mcpServers": {
-            "gitlab": {
-              "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
-              "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
-              "timeout": 60000,
-              "includeTools": [
-                "get_merge_request",
-                "get_merge_request_changes",
-                "get_merge_request_commits",
-                "discussion_add_note",
-                "discussion_list"
-              ]
-            }
+      cat > "$HOME/.gemini/settings.json" <<'JSON'
+      {
+        "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
+        "mcpServers": {
+          "gitlab": {
+            "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
+            "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
+            "timeout": 60000,
+            "includeTools": [
+              "get_merge_request",
+              "get_merge_request_changes",
+              "get_merge_request_commits",
+              "discussion_add_note",
+              "discussion_list"
+            ]
           }
         }
-        JSON
-      fi
+      }
+      JSON
+    # 🔐 ensure key is present and usable
+    - test -n "$GEMINI_API_KEY" || (echo "❌ GEMINI_API_KEY missing"; exit 1)
+    - echo "🔑 GEMINI_API_KEY present (len=$(echo -n "$GEMINI_API_KEY" | wc -c))"
+    # quick ping to prove auth works (no MCP yet)
+    - gemini --yolo --prompt "Say: OK" | grep -q "OK" || (echo "❌ Gemini auth failed"; exit 1)
   script:
     - echo "AI review for MR !${CI_MERGE_REQUEST_IID} in ${CI_PROJECT_PATH}"
-    - gemini --yolo --prompt "${GEMINI_PROMPT}"
+    - |
+      gemini --yolo <<'PROMPT'
+      You are a senior reviewer for a Unity/C# project.
+      1) Use GitLab MCP tools to read THIS MR’s changes and intent.
+      2) Post ONE concise summary comment with the top risks.
+      3) Post ONE suggestions comment with safe GitLab suggestions.
+      PROMPT
   allow_failure: true
   artifacts:
     when: always
