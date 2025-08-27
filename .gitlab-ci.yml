@@ -1,34 +1,24 @@
-stages: [test, ai_review]
-
-# ✅ Smoketest: proves the bot token can post to the MR
-bot-smoketest:
-  stage: test
-  tags: [ai]                           # <-- tag goes on the job
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  script:
-    - |
-      curl -sS --request POST \
-        --header "PRIVATE-TOKEN: ${GITLAB_REVIEW_PAT}" \
-        --header "Content-Type: application/json" \
-        --data "{\"body\":\"✅ Bot smoketest from ${CI_RUNNER_DESCRIPTION} for MR !${CI_MERGE_REQUEST_IID}.\"}" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
-
-# ✅ Gemini review (kept minimal for shell executor on macOS)
 ai-gemini-review:
   stage: ai_review
-  tags: [ai]                           # <-- tag on the job
+  tags: [ai]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   before_script:
-    - which node || (brew install node || true)
+    # Ensure Homebrew/Node available for shell runner on macOS
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+    - command -v npm || ( brew update && brew install node )
+    - npm --version
     - npm install -g @google/gemini-cli
+
     - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
     - export GITLAB_MCP_VERSION="1.29.0"
+    # ✅ Correct binary for macOS Apple Silicon
     - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" \
         "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Darwin_arm64.tar.gz"
     - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
     - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
+
+    # Minimal settings with MCP + bot token
     - |
       cat > "$HOME/.gemini/settings.json" <<'JSON'
       {
@@ -46,7 +36,12 @@ ai-gemini-review:
         }
       }
       JSON
+
+    # (Optional) sanity check that key is injected (prints only length)
+    - test -n "$GEMINI_API_KEY" || (echo "GEMINI_API_KEY missing"; exit 1)
+    - echo "GEMINI_API_KEY present (len=$(echo -n "$GEMINI_API_KEY" | wc -c))"
   script:
+    - echo "AI review for MR !${CI_MERGE_REQUEST_IID} in ${CI_PROJECT_PATH}"
     - |
       gemini --yolo <<'PROMPT'
       You are a senior reviewer for a Unity/C# project.
