@@ -1,47 +1,53 @@
-image: ruby:2.7
+stages: [ai_review]
 
-cache:
-  paths:
-  - vendor
-
-test:
+ai-gemini-review:
+  stage: ai_review
+  image: node:20-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_STRATEGY: fetch
+  before_script:
+    # 1) Install Gemini CLI (core of that GitHub repo)
+    - npm install -g @google/gemini-cli
+    # 2) Get GitLab MCP helper to read MR + post comments
+    - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
+    - export GITLAB_MCP_VERSION="1.29.0"
+    - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz"
+    - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
+    - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
+    # 3) Limit tools (least privilege)
+    - |
+      cat > "$HOME/.gemini/settings.json" <<'JSON'
+      {
+        "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
+        "mcpServers": {
+          "gitlab": {
+            "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
+            "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
+            "timeout": 5000,
+            "includeTools": [
+              "get_merge_request",
+              "get_merge_request_changes",
+              "get_merge_request_commits",
+              "discussion_add_note",
+              "discussion_list"
+            ]
+          }
+        }
+      }
+      JSON
   script:
-  - apt-get update -yqqq
-  - curl -sL https://deb.nodesource.com/setup_18.x | bash -
-  - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-  - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-  - apt update
-  - apt-get install -y nodejs yarn
-  - export GEM_HOME=$PWD/gems
-  - export PATH=$PWD/gems/bin:$PATH
-  - gem install bundler
-  - gem install activesupport -v 6.1.7
-  - gem install bridgetown -N
-  - bundle install
-  - yarn install
-  - bin/bridgetown deploy
-  - bin/bridgetown clean
-  except:
-    - main
-
-pages:
-  script:
-  - apt-get update -yqqq
-  - curl -sL https://deb.nodesource.com/setup_18.x | bash -
-  - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-  - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-  - apt update
-  - apt-get install -y nodejs yarn
-  - export GEM_HOME=$PWD/gems
-  - export PATH=$PWD/gems/bin:$PATH
-  - gem install bundler
-  - gem install bridgetown -N
-  - bundle install
-  - yarn install
-  - bin/bridgetown deploy
-  - mv output public
+    - echo "AI review for MR !${CI_MERGE_REQUEST_IID} in ${CI_PROJECT_PATH}"
+    - |
+      gemini --yolo <<'PROMPT'
+      You are a senior reviewer for a Unity/C# project.
+      1) Use the GitLab MCP tools to read THIS merge request’s changes and intent.
+      2) Post ONE concise summary comment with top risks (correctness, performance, security, CI/Unity pitfalls).
+      3) Post ONE suggestions comment with small, safe diffs (GitLab suggestion blocks).
+      Keep it actionable; no speculative rewrites; reference files/lines where possible.
+      PROMPT
+  allow_failure: true
   artifacts:
-    paths:
-    - public
-  only:
-  - main
+    when: always
+    paths: [ai_review_report.md]
