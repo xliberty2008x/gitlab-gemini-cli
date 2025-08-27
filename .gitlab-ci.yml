@@ -1,38 +1,27 @@
-stages: [test, ai_review]
+stages: [ai_review]
 
-# ✅ 1) Bot smoketest — proves the runner + GITLAB_REVIEW_PAT can post to the MR
-bot-smoketest:
-  stage: test
-  tags: [ai]
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  script:
-    # Fail fast if PAT missing
-    - if [ -z "$GITLAB_REVIEW_PAT" ]; then echo "❌ GITLAB_REVIEW_PAT is missing"; exit 1; fi
-    # Post a single MR note
-    - |
-      curl -sS --request POST \
-        --header "PRIVATE-TOKEN: ${GITLAB_REVIEW_PAT}" \
-        --header "Content-Type: application/json" \
-        --data "{\"body\":\"✅ Bot smoketest from ${CI_RUNNER_DESCRIPTION} on ${HOSTNAME} for MR !${CI_MERGE_REQUEST_IID}.\"}" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" \
-      >/dev/null || { echo "❌ Failed to post smoketest note"; exit 1; }
-  allow_failure: false
-
-# ✅ 2) Gemini AI review — runs on your macOS shell runner
 ai-gemini-review:
   stage: ai_review
   tags: [ai]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GEMINI_PROMPT: |
+      You are a senior reviewer for a Unity/C# project.
+      1) Use GitLab MCP tools to read THIS MR’s changes and intent.
+      2) Post ONE concise summary comment with top risks (correctness, performance, security, CI/Unity pitfalls).
+      3) Post ONE suggestions comment with safe GitLab suggestions.
+    GEMINI_CLI_VERSION: "latest"
+    GOOGLE_GENAI_USE_VERTEXAI: "false"
+    GOOGLE_GENAI_USE_GCA: "false"
   before_script:
-    # Ensure Homebrew/Node are available for shell runner on macOS (Apple Silicon)
     - export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
     - command -v npm || ( brew update && brew install -q node )
-    - npm --version
-    - npm install -g @google/gemini-cli
+    - npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
+    - test -n "$GEMINI_API_KEY" || { echo "❌ GEMINI_API_KEY missing"; exit 1; }
+    - test -n "$GITLAB_REVIEW_PAT" || { echo "❌ GITLAB_REVIEW_PAT missing"; exit 1; }
 
-    # Prepare GitLab MCP (✅ correct Darwin/arm64 build)
+    # Install the correct MCP binary for macOS Apple Silicon
     - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
     - export GITLAB_MCP_VERSION="1.29.0"
     - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" \
@@ -40,41 +29,35 @@ ai-gemini-review:
     - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
     - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
 
-    # Minimal Gemini settings: only the tools we need; pass PAT to MCP
+    # Combine optional .gemini/settings.json from “settings” input + MCP server
     - |
-      cat > "$HOME/.gemini/settings.json" <<'JSON'
-      {
-        "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
-        "mcpServers": {
-          "gitlab": {
-            "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
-            "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
-            "timeout": 5000,
-            "includeTools": [
-              "get_merge_request",
-              "get_merge_request_changes",
-              "get_merge_request_commits",
-              "discussion_add_note",
-              "discussion_list"
-            ]
+      mkdir -p "$HOME/.gemini"
+      if [ -n "${GEMINI_SETTINGS_JSON}" ]; then
+        echo "${GEMINI_SETTINGS_JSON}" > "$HOME/.gemini/settings.json"
+      else
+        cat > "$HOME/.gemini/settings.json" <<'JSON'
+        {
+          "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
+          "mcpServers": {
+            "gitlab": {
+              "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
+              "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
+              "timeout": 60000,
+              "includeTools": [
+                "get_merge_request",
+                "get_merge_request_changes",
+                "get_merge_request_commits",
+                "discussion_add_note",
+                "discussion_list"
+              ]
+            }
           }
         }
-      }
-      JSON
-
-    # 🔐 Hard check: Gemini key must be present
-    - if [ -z "$GEMINI_API_KEY" ]; then echo "❌ GEMINI_API_KEY is missing (add it in Settings → CI/CD → Variables)"; exit 1; fi
-    - echo "🔑 GEMINI_API_KEY present (len=$(echo -n "$GEMINI_API_KEY" | wc -c))"
+        JSON
+      fi
   script:
     - echo "AI review for MR !${CI_MERGE_REQUEST_IID} in ${CI_PROJECT_PATH}"
-    - |
-      gemini --yolo <<'PROMPT'
-      You are a senior reviewer for a Unity/C# project.
-      1) Use the GitLab MCP tools to read THIS merge request’s changes and intent.
-      2) Post ONE concise summary comment with the top risks (correctness, performance, security, CI/Unity pitfalls).
-      3) Post ONE suggestions comment with small, safe GitLab suggestions (```suggestion ... ```).
-      Keep it actionable and reference files/lines when possible. No speculative rewrites.
-      PROMPT
+    - gemini --yolo --prompt "${GEMINI_PROMPT}"
   allow_failure: true
   artifacts:
     when: always
