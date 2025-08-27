@@ -1,53 +1,17 @@
-stages: [ai_review]
+stages: [test, ai_review]
 
-ai-gemini-review:
-  stage: ai_review
-  image: node:20-slim
+bot-smoketest:
+  stage: test
+  image: alpine:3.19
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  variables:
-    GIT_STRATEGY: fetch
   before_script:
-    # 1) Install Gemini CLI (core of that GitHub repo)
-    - npm install -g @google/gemini-cli
-    # 2) Get GitLab MCP helper to read MR + post comments
-    - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
-    - export GITLAB_MCP_VERSION="1.29.0"
-    - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz"
-    - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
-    - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
-    # 3) Limit tools (least privilege)
-    - |
-      cat > "$HOME/.gemini/settings.json" <<'JSON'
-      {
-        "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
-        "mcpServers": {
-          "gitlab": {
-            "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
-            "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
-            "timeout": 5000,
-            "includeTools": [
-              "get_merge_request",
-              "get_merge_request_changes",
-              "get_merge_request_commits",
-              "discussion_add_note",
-              "discussion_list"
-            ]
-          }
-        }
-      }
-      JSON
+    - apk add --no-cache curl jq
   script:
-    - echo "AI review for MR !${CI_MERGE_REQUEST_IID} in ${CI_PROJECT_PATH}"
-    - |
-      gemini --yolo <<'PROMPT'
-      You are a senior reviewer for a Unity/C# project.
-      1) Use the GitLab MCP tools to read THIS merge request’s changes and intent.
-      2) Post ONE concise summary comment with top risks (correctness, performance, security, CI/Unity pitfalls).
-      3) Post ONE suggestions comment with small, safe diffs (GitLab suggestion blocks).
-      Keep it actionable; no speculative rewrites; reference files/lines where possible.
-      PROMPT
-  allow_failure: true
-  artifacts:
-    when: always
-    paths: [ai_review_report.md]
+    # Post a single discussion note to THIS MR
+    - 'curl -sS --request POST
+        --header "PRIVATE-TOKEN: ${GITLAB_REVIEW_PAT}"
+        --header "Content-Type: application/json"
+        --data "{\"body\":\"✅ Bot smoketest: CI can comment on MR !${CI_MERGE_REQUEST_IID}.\"}"
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
+      | jq -r ".body"'
