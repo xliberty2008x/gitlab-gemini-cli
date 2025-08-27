@@ -1,5 +1,5 @@
 stages: [test, ai_review]
-
+tags: [ai]
 bot-smoketest:
   stage: test
   image: alpine:3.19
