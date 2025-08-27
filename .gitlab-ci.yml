@@ -1,17 +1,60 @@
 stages: [test, ai_review]
-tags: [ai]
+
+# ✅ Smoketest: proves the bot token can post to the MR
 bot-smoketest:
   stage: test
-  image: alpine:3.19
+  tags: [ai]                           # <-- tag goes on the job
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - |
+      curl -sS --request POST \
+        --header "PRIVATE-TOKEN: ${GITLAB_REVIEW_PAT}" \
+        --header "Content-Type: application/json" \
+        --data "{\"body\":\"✅ Bot smoketest from ${CI_RUNNER_DESCRIPTION} for MR !${CI_MERGE_REQUEST_IID}.\"}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
+
+# ✅ Gemini review (kept minimal for shell executor on macOS)
+ai-gemini-review:
+  stage: ai_review
+  tags: [ai]                           # <-- tag on the job
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   before_script:
-    - apk add --no-cache curl jq
+    - which node || (brew install node || true)
+    - npm install -g @google/gemini-cli
+    - mkdir -p "$CI_PROJECT_DIR/bin" "$HOME/.gemini"
+    - export GITLAB_MCP_VERSION="1.29.0"
+    - curl -sSL -o "$CI_PROJECT_DIR/bin/mcp.tgz" \
+        "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Darwin_arm64.tar.gz"
+    - tar -xzf "$CI_PROJECT_DIR/bin/mcp.tgz" -C "$CI_PROJECT_DIR/bin"
+    - chmod +x "$CI_PROJECT_DIR/bin/gitlab-mcp"
+    - |
+      cat > "$HOME/.gemini/settings.json" <<'JSON'
+      {
+        "coreTools": ["LSTool","ReadFileTool","GrepTool","GlobTool","ReadManyFilesTool"],
+        "mcpServers": {
+          "gitlab": {
+            "command": "${CI_PROJECT_DIR}/bin/gitlab-mcp",
+            "env": { "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}" },
+            "timeout": 5000,
+            "includeTools": [
+              "get_merge_request","get_merge_request_changes","get_merge_request_commits",
+              "discussion_add_note","discussion_list"
+            ]
+          }
+        }
+      }
+      JSON
   script:
-    # Post a single discussion note to THIS MR
-    - 'curl -sS --request POST
-        --header "PRIVATE-TOKEN: ${GITLAB_REVIEW_PAT}"
-        --header "Content-Type: application/json"
-        --data "{\"body\":\"✅ Bot smoketest: CI can comment on MR !${CI_MERGE_REQUEST_IID}.\"}"
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
-      | jq -r ".body"'
+    - |
+      gemini --yolo <<'PROMPT'
+      You are a senior reviewer for a Unity/C# project.
+      1) Use GitLab MCP tools to read THIS MR’s changes and intent.
+      2) Post ONE concise summary comment with top risks.
+      3) Post ONE suggestions comment with safe GitLab suggestions.
+      PROMPT
+  allow_failure: true
+  artifacts:
+    when: always
+    paths: [ai_review_report.md]
