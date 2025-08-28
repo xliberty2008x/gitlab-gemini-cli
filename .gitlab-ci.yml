@@ -1,60 +1,82 @@
-stages: [ai_review]
+stages:
+  - review
 
-ai-gemini-review:
-  stage: ai_review
-  tags: [ai]
+gemini_cli_code_review:
+  stage: review
+  tags: [ai]  # match your runner tag
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    # Your self-hosted GitLab MCP endpoint as per docs:
+    # https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/
+    GITLAB_MCP_URL: "https://hs2git.ab-games.com/api/v4/mcp"
+    GEMINI_SANDBOX_IMAGE: "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.11"
   script: |
     set -euo pipefail
     export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-    # Sanity: secrets present
-    test -n "$GITLAB_REVIEW_PAT" || { echo "GITLAB_REVIEW_PAT missing"; exit 1; }
-    test -n "$GEMINI_API_KEY"    || { echo "GEMINI_API_KEY missing"; exit 1; }
+    echo "Starting the Gemini CLI job..."
 
-    # Make sure Node + Gemini CLI exist
-    command -v npm >/dev/null 2>&1 || (brew update && brew install -q node)
-    npm install -g @google/gemini-cli
-    gemini --version
+    # --- host (runner) sanity ---
+    command -v docker >/dev/null 2>&1 || { echo "❌ Docker not available on runner host"; exit 1; }
+    if [ -z "${GEMINI_API_KEY:-}" ]; then
+      echo "Error: The 'GEMINI_API_KEY' CI/CD variable is not set."
+      echo "Please configure it in your project's Settings > CI/CD > Variables."
+      exit 1
+    fi
 
-    # Write Gemini settings to use Dockerized MCP GitLab server
-    mkdir -p "$HOME/.gemini"
-    cat > "$HOME/.gemini/settings.json" <<'JSON'
-    {
-      "mcpServers": {
-        "gitlab": {
-          "command": "docker",
-          "args": [
-            "run", "--rm", "-i",
-            "-e", "GITLAB_PERSONAL_ACCESS_TOKEN",
-            "-e", "GITLAB_API_URL",
-            "mcp/gitlab"
-          ],
-          "env": {
-            "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
-            "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
-          },
-          "includeTools": [
-            "get_merge_request",
-            "get_merge_request_changes",
-            "get_merge_request_commits",
-            "discussion_add_note",
-            "discussion_list"
-          ],
-          "timeout": 60000
+    echo "Pulling Gemini CLI sandbox image: ${GEMINI_SANDBOX_IMAGE}"
+    docker pull "${GEMINI_SANDBOX_IMAGE}"
+
+    # Run everything inside the Gemini CLI container (Linux).
+    docker run --rm -i \
+      -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
+      -e GITLAB_MCP_URL="${GITLAB_MCP_URL}" \
+      -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
+      -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
+      -v "${CI_PROJECT_DIR}:/workspace" \
+      -w /workspace \
+      "${GEMINI_SANDBOX_IMAGE}" \
+      bash -lc '
+        set -euo pipefail
+
+        echo "Using API KEY Authentication"
+        if [ -z "${GEMINI_API_KEY:-}" ]; then
+          echo "Error: The '\''GEMINI_API_KEY'\'' CI/CD variable is not set."
+          echo "Please configure it in your project'\''s Settings > CI/CD > Variables."
+          exit 1
+        fi
+
+        echo "Writing Gemini CLI settings to use GitLab MCP (via mcp-remote)…"
+        # Per GitLab docs: use npx mcp-remote https://<gitlab>/api/v4/mcp
+        # This relies on OAuth Dynamic Client Registration enabled on your instance.  [oai_citation:1‡GitLab Docs](https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/)
+        mkdir -p "$HOME/.gemini"
+        cat > "$HOME/.gemini/settings.json" <<EOF
+        {
+          "mcpServers": {
+            "GitLab": {
+              "command": "npx",
+              "args": ["mcp-remote", "${GITLAB_MCP_URL}"]
+            }
+          }
         }
-      }
-    }
-    JSON
+        EOF
 
-    # Quick auth ping (fails fast if GEMINI_API_KEY is wrong)
-    gemini --yolo --prompt "Say: OK" | grep -q "OK"
+        echo "Performing Code Review with Gemini"
+        # Non-interactive run ("yolo" mode), exactly like your flow:
+        gemini --yolo <<EOF
+          Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
+          Consider all the collaborator comments in the MR that explain the code.
 
-    # Real review
-    gemini --yolo <<'PROMPT'
-    You are a senior reviewer for a Unity/C# project.
-    1) Use the GitLab MCP tools to read THIS MR’s changes and intent.
-    2) Post ONE concise summary comment with the top risks (correctness, performance, security, CI/Unity pitfalls).
-    3) Post ONE suggestions comment with safe GitLab suggestions.
-    PROMPT
+          Steps:
+          1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
+          2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
+        EOF
+      '
+
+    # optional tiny artifact to silence warnings
+    echo "Run at $(date)" > ai_review_report.md
+  artifacts:
+    when: always
+    paths: [ai_review_report.md]
+  allow_failure: true
