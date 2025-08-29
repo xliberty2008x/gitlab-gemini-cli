@@ -31,9 +31,16 @@ gemini_cli_code_review:
         exit 1
       fi
 
+      echo "Checking workspace contents..."
+      ls -la /workspace/
       echo "Testing MCP server startup..."
-      chmod +x /workspace/gitlab-mcp-server.js
-      timeout 5 node /workspace/gitlab-mcp-server.js --version 2>/dev/null || echo "MCP server test completed"
+      if [ -f "/workspace/gitlab-mcp-server.js" ]; then
+        echo "MCP server file found, testing startup..."
+        timeout 5 node /workspace/gitlab-mcp-server.js --version 2>/dev/null || echo "MCP server test completed"
+      else
+        echo "❌ MCP server file not found at /workspace/gitlab-mcp-server.js"
+        exit 1
+      fi
       
       echo "Writing Gemini CLI settings to use local GitLab MCP..."
       mkdir -p "$HOME/.gemini"
