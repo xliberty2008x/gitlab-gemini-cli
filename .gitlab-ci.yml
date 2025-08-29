@@ -1,0 +1,79 @@
+stages:
+  - review
+
+gemini_cli_code_review:
+  stage: review
+  tags: [ai]  # your runner tag
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GEMINI_SANDBOX_IMAGE: "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.11"
+  script: |
+    set -euo pipefail
+    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/local/share/npm-global/bin:$PATH"
+
+    echo "Starting the Gemini CLI job..."
+
+    # host checks
+    command -v docker >/dev/null 2>&1 || { echo "❌ Docker not available on runner host"; exit 1; }
+    [ -n "${GEMINI_API_KEY:-}" ]    || { echo "❌ GEMINI_API_KEY is not set"; exit 1; }
+
+    echo "Pulling Gemini CLI sandbox image: ${GEMINI_SANDBOX_IMAGE}"
+    docker pull "${GEMINI_SANDBOX_IMAGE}"
+
+    # run inside the container
+    docker run --rm -i \
+      -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
+      -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
+      -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
+      -e GITLAB_ACCESS_TOKEN="${GITLAB_ACCESS_TOKEN}" \
+      -v "${CI_PROJECT_DIR}:/workspace" \
+      -w /workspace \
+      "${GEMINI_SANDBOX_IMAGE}" \
+      bash -lc '
+        set -euo pipefail
+
+        echo "Installing MCP server dependencies..."
+        npm install
+
+        echo "Using API KEY Authentication"
+        if [ -z "${GEMINI_API_KEY:-}" ]; then
+          echo "Error: The '\''GEMINI_API_KEY'\'' CI/CD variable is not set."
+          echo "Please configure it in your project'\'s Settings > CI/CD > Variables."
+          exit 1
+        fi
+
+        echo "Writing Gemini CLI settings to use local GitLab MCP..."
+        mkdir -p "$HOME/.gemini"
+        cat > "$HOME/.gemini/settings.json" <<EOF
+        {
+          "mcpServers": {
+            "GitLab": {
+              "command": "node",
+              "args": ["/workspace/gitlab-mcp-server.js"],
+              "env": {
+                "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_ACCESS_TOKEN}"
+              }
+            }
+          }
+        }
+        EOF
+
+        echo "Performing Code Review with Gemini"
+        # Non-interactive run ("yolo" mode) — your original prompt:
+        gemini --yolo <<EOF
+          Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
+          Consider all the collaborator comments in the MR that explain the code.
+
+          Steps:
+          1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
+          2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
+        EOF
+      '
+
+    # small artifact to avoid warnings
+    echo "Run at $(date)" > ai_review_report.md
+  artifacts:
+    when: always
+    paths: [ai_review_report.md]
+  allow_failure: true
