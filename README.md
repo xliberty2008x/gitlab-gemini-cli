@@ -8,4 +8,4 @@ This project is set up to test the `.gitlab-ci.yml` configuration.
 2.  Configure the project for remote access to GitLab.
 3.  Trigger the CI/CD pipeline and verify that all actions execute as expected.
 
-Testing the CI pipeline.
+Testing the CI pipeline again.
