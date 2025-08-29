@@ -33,7 +33,8 @@ gemini_cli_code_review:
             "command": "node",
             "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
             "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}"
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}",
+              "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
             },
             "timeout": 5000,
             "includeTools": [
@@ -64,15 +65,29 @@ gemini_cli_code_review:
       EOF
       
     - |
+      echo "Debugging GitLab CI variables:"
+      echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"
+      echo "CI_PROJECT_ID: ${CI_PROJECT_ID}"
+      echo "CI_MERGE_REQUEST_IID: ${CI_MERGE_REQUEST_IID}"
+      echo "CI_MERGE_REQUEST_PROJECT_URL: ${CI_MERGE_REQUEST_PROJECT_URL}"
+      
+    - |
       echo "Performing Code Review with Gemini"
       # This runs in "yolo mode" because the pipeline runs non-interactively
       gemini --yolo <<EOF
-        Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
-        Consider all the collaborator comments in the MR that explain the code.
-
-        Steps:
-        1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
-        2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
+        You are reviewing merge request ${CI_MERGE_REQUEST_IID} in GitLab project "${CI_PROJECT_PATH}" (ID: ${CI_PROJECT_ID}).
+        
+        Please:
+        1. Use get_merge_request with project_id="${CI_PROJECT_PATH}" and merge_request_iid="${CI_MERGE_REQUEST_IID}" to get MR details
+        2. Use get_merge_request_changes to see what files were changed
+        3. Use get_merge_request_commits to see the commits
+        4. Use discussion_list to see existing comments (to avoid duplicates)
+        5. Then use discussion_add_note to post your review comments
+        
+        Provide a thorough code review with:
+        - A concise summary of the proposed changes
+        - A prioritized list of suggestions with specific code references
+        - Consider any existing comments or discussions
       EOF
       
     - |
