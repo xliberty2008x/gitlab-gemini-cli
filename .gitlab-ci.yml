@@ -34,6 +34,12 @@ gemini_cli_code_review:
       echo "Checking workspace contents..."
       ls -la /workspace/
       
+      echo "Debugging GitLab CI variables:"
+      echo "CI_MERGE_REQUEST_PROJECT_URL: ${CI_MERGE_REQUEST_PROJECT_URL}"
+      echo "CI_MERGE_REQUEST_IID: ${CI_MERGE_REQUEST_IID}"
+      echo "CI_PROJECT_ID: ${CI_PROJECT_ID}"
+      echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"
+      
       echo "Testing MCP server startup..."
       if [ -f "/workspace/gitlab-mcp-server.js" ]; then
         echo "MCP server file found, testing startup..."
@@ -61,12 +67,17 @@ gemini_cli_code_review:
 
       echo "Performing Code Review with Gemini"
       gemini --yolo <<EOF
-        Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
-        Consider all the collaborator comments in the MR that explain the code.
-
-        Steps:
-        1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
-        2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
+        Provide a consistent and thorough code review in GitLab project with ID ${CI_PROJECT_ID} (path: ${CI_PROJECT_PATH}) for merge request ${CI_MERGE_REQUEST_IID}.
+        
+        Use the GitLab MCP server to:
+        1. First, get the merge request details using get_merge_request with project_id="${CI_PROJECT_PATH}" and merge_request_iid="${CI_MERGE_REQUEST_IID}"
+        2. Get the file changes using get_merge_request_changes
+        3. Get the commits using get_merge_request_commits
+        
+        Then provide a thorough code review with:
+        1. A concise summary of the proposed changes
+        2. A prioritized list of suggestions with specific code references
+        3. Consider any existing comments or discussions in the MR
       EOF
       DOCKER_SCRIPT
     - | 
@@ -75,6 +86,8 @@ gemini_cli_code_review:
         -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
         -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
         -e GITLAB_PERSONAL_ACCESS_TOKEN="${CI_JOB_TOKEN}" \
+        -e CI_PROJECT_ID="${CI_PROJECT_ID}" \
+        -e CI_PROJECT_PATH="${CI_PROJECT_PATH}" \
         -v "${CI_PROJECT_DIR}:/workspace" \
         -v "/tmp/gemini_ci_script.sh:/gemini_ci_script.sh" \
         -w /workspace \
