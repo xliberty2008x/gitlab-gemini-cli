@@ -33,7 +33,6 @@ gemini_cli_code_review:
 
       echo "Checking workspace contents..."
       ls -la /workspace/
-      
       echo "Testing MCP server startup..."
       if [ -f "/workspace/gitlab-mcp-server.js" ]; then
         echo "MCP server file found, testing startup..."

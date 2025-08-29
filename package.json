@@ -1,20 +1,18 @@
 {
-  "name": "enhanced-gitlab-mcp-server",
+  "name": "bridgetown",
   "version": "1.0.0",
-  "description": "Enhanced GitLab MCP server with full MR read support",
-  "main": "gitlab-mcp-server.js",
-  "bin": {
-    "enhanced-gitlab-mcp": "./gitlab-mcp-server.js"
-  },
+  "private": true,
   "scripts": {
-    "start": "node gitlab-mcp-server.js"
+    "esbuild": "node esbuild.config.js --minify",
+    "esbuild-dev": "node esbuild.config.js --watch"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.1",
-    "node-fetch": "^2.7.0"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "license": "MIT"
+  "devDependencies": {
+    "esbuild": "^0.14.39",
+    "glob": "^8.0.1",
+    "postcss": "^8.4.12",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    "postcss-import": "^14.1.0",
+    "postcss-load-config": "^3.1.4",
+    "postcss-preset-env": "^7.4.3"
+  }
 }
