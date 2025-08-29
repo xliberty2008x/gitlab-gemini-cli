@@ -31,6 +31,10 @@ gemini_cli_code_review:
         exit 1
       fi
 
+      echo "Testing MCP server startup..."
+      chmod +x /workspace/gitlab-mcp-server.js
+      timeout 5 node /workspace/gitlab-mcp-server.js --version 2>/dev/null || echo "MCP server test completed"
+      
       echo "Writing Gemini CLI settings to use local GitLab MCP..."
       mkdir -p "$HOME/.gemini"
       cat > "$HOME/.gemini/settings.json" <<EOF
@@ -40,7 +44,7 @@ gemini_cli_code_review:
             "command": "node",
             "args": ["/workspace/gitlab-mcp-server.js"],
             "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}"
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_PERSONAL_ACCESS_TOKEN}"
             }
           }
         }
@@ -62,7 +66,7 @@ gemini_cli_code_review:
         -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
         -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
         -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
-        -e CI_JOB_TOKEN="${CI_JOB_TOKEN}" \
+        -e GITLAB_PERSONAL_ACCESS_TOKEN="${CI_JOB_TOKEN}" \
         -v "${CI_PROJECT_DIR}:/workspace" \
         -v "/tmp/gemini_ci_script.sh:/gemini_ci_script.sh" \
         -w /workspace \
