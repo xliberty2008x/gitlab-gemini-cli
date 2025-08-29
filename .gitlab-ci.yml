@@ -18,20 +18,8 @@ gemini_cli_code_review:
         exit 1
       fi
       
-      echo "Debugging GitLab CI variables:"
-      echo "CI_MERGE_REQUEST_PROJECT_URL: ${CI_MERGE_REQUEST_PROJECT_URL}"
-      echo "CI_MERGE_REQUEST_IID: ${CI_MERGE_REQUEST_IID}"
-      echo "CI_PROJECT_ID: ${CI_PROJECT_ID}"
-      echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"
-      
-      echo "Testing MCP server startup..."
-      if [ -f "/workspace/gitlab-mcp-server.js" ]; then
-        echo "MCP server file found, testing startup..."
-        timeout 5 node /workspace/gitlab-mcp-server.js --version 2>/dev/null || echo "MCP server test completed"
-      else
-        echo "❌ MCP server file not found at /workspace/gitlab-mcp-server.js"
-        exit 1
-      fi
+      echo "Installing MCP server dependencies..."
+      npm install
       
     - |
       echo "Writing Gemini CLI settings with enhanced MCP server..."
