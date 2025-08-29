@@ -3,99 +3,79 @@ stages:
 
 gemini_cli_code_review:
   stage: review
-  tags: [ai]
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  variables:
-    GEMINI_SANDBOX_IMAGE: "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.11"
+  
+  # Use the official Gemini CLI sandbox image
+  image: us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.11
+
   script:
-    - | 
-      set -euo pipefail
-      echo "Starting the Gemini CLI job..."
-      command -v docker >/dev/null 2>&1 || { echo "❌ Docker not available on runner host"; exit 1; }
-      [ -n "${GEMINI_API_KEY:-}" ]    || { echo "❌ GEMINI_API_KEY is not set"; exit 1; }
-      [ -n "${CI_JOB_TOKEN:-}" ]      || { echo "❌ CI_JOB_TOKEN is not available"; exit 1; }
-      echo "Pulling Gemini CLI sandbox image: ${GEMINI_SANDBOX_IMAGE}"
-      docker pull "${GEMINI_SANDBOX_IMAGE}"
-    - | 
-      cat > /tmp/gemini_ci_script.sh << 'DOCKER_SCRIPT'
-      set -euo pipefail
-
-      echo "Installing MCP server dependencies..."
-      npm install
-
+    - echo "Starting the Gemini CLI job..."
+    
+    - |
       echo "Using API KEY Authentication"
-      if [ -z "${GEMINI_API_KEY:-}" ]; then
+      if [ -z "$GEMINI_API_KEY" ]; then
         echo "Error: The 'GEMINI_API_KEY' CI/CD variable is not set."
         echo "Please configure it in your project's Settings > CI/CD > Variables."
         exit 1
       fi
-
-      echo "Checking workspace contents..."
-      ls -la /workspace/
       
-      echo "Debugging GitLab CI variables:"
-      echo "CI_MERGE_REQUEST_PROJECT_URL: ${CI_MERGE_REQUEST_PROJECT_URL}"
-      echo "CI_MERGE_REQUEST_IID: ${CI_MERGE_REQUEST_IID}"
-      echo "CI_PROJECT_ID: ${CI_PROJECT_ID}"
-      echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"
+    - |
+      echo "Downloading and extracting gitlab-mcp binary..."
+      GITLAB_MCP_VERSION="1.29.0"
+      curl -L -O "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz"
+      tar -xzf gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz
+      chmod +x gitlab-mcp
       
-      echo "Testing MCP server startup..."
-      if [ -f "/workspace/gitlab-mcp-server.js" ]; then
-        echo "MCP server file found, testing startup..."
-        timeout 5 node /workspace/gitlab-mcp-server.js --version 2>/dev/null || echo "MCP server test completed"
-      else
-        echo "❌ MCP server file not found at /workspace/gitlab-mcp-server.js"
-        exit 1
-      fi
-      
-      echo "Writing Gemini CLI settings to use local GitLab MCP..."
+    - |
+      echo "Writing Gemini CLI settings..."
       mkdir -p "$HOME/.gemini"
-      cat > "$HOME/.gemini/settings.json" <<EOF
+      cat <<EOF > "$HOME/.gemini/settings.json"
       {
+        "coreTools": ["LSTool", "ReadFileTool", "GrepTool", "GlobTool", "ReadManyFilesTool"],
         "mcpServers": {
-          "GitLab": {
-            "command": "node",
-            "args": ["/workspace/gitlab-mcp-server.js"],
+          "gitlab": {
+            "command": "${CI_PROJECT_DIR}/gitlab-mcp",
             "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_PERSONAL_ACCESS_TOKEN}"
-            }
+              "GITLAB_TOKEN": "${CI_JOB_TOKEN}"
+            },
+            "timeout": 5000,
+            "includeTools": [
+              "discussion_add_note", 
+              "discussion_list",
+              "get_merge_request_changes",
+              "get_merge_request_commits",
+              "get_merge_request_dependencies",
+              "get_merge_request_participants",
+              "get_merge_request_reviewers",
+              "get_merge_request",
+              "get_repository_file_contents",
+              "list_merge_request_diffs",
+              "list_project_merge_requests"
+            ]
           }
         }
       }
       EOF
-
+      
+    - |
       echo "Performing Code Review with Gemini"
+      # This runs in "yolo mode" because the pipeline runs non-interactively
       gemini --yolo <<EOF
-        Provide a consistent and thorough code review in GitLab project with ID ${CI_PROJECT_ID} (path: ${CI_PROJECT_PATH}) for merge request ${CI_MERGE_REQUEST_IID}.
-        
-        Use the GitLab MCP server to:
-        1. First, get the merge request details using get_merge_request with project_id="${CI_PROJECT_PATH}" and merge_request_iid="${CI_MERGE_REQUEST_IID}"
-        2. Get the file changes using get_merge_request_changes
-        3. Get the commits using get_merge_request_commits
-        
-        Then provide a thorough code review with:
-        1. A concise summary of the proposed changes
-        2. A prioritized list of suggestions with specific code references
-        3. Consider any existing comments or discussions in the MR
+        Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
+        Consider all the collaborator comments in the MR that explain the code.
+
+        Steps:
+        1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
+        2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
       EOF
-      DOCKER_SCRIPT
-    - | 
-      docker run --rm -i \
-        -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
-        -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
-        -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
-        -e GITLAB_PERSONAL_ACCESS_TOKEN="${CI_JOB_TOKEN}" \
-        -e CI_PROJECT_ID="${CI_PROJECT_ID}" \
-        -e CI_PROJECT_PATH="${CI_PROJECT_PATH}" \
-        -v "${CI_PROJECT_DIR}:/workspace" \
-        -v "/tmp/gemini_ci_script.sh:/gemini_ci_script.sh" \
-        -w /workspace \
-        "${GEMINI_SANDBOX_IMAGE}" \
-        bash /gemini_ci_script.sh
-    - | 
+      
+    - |
       echo "Run at $(date)" > ai_review_report.md
+
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    
   artifacts:
     when: always
     paths: [ai_review_report.md]
+    
   allow_failure: true
