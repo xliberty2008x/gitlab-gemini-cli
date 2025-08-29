@@ -39,7 +39,7 @@ gemini_cli_code_review:
         echo "Using API KEY Authentication"
         if [ -z "${GEMINI_API_KEY:-}" ]; then
           echo "Error: The '\''GEMINI_API_KEY'\'' CI/CD variable is not set."
-          echo "Please configure it in your project'\'s Settings > CI/CD > Variables."
+          echo "Please configure it in your project's Settings > CI/CD > Variables."
           exit 1
         fi
 
