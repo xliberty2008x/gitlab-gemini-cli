@@ -14,6 +14,7 @@ gemini_cli_code_review:
       echo "Starting the Gemini CLI job..."
       command -v docker >/dev/null 2>&1 || { echo "❌ Docker not available on runner host"; exit 1; }
       [ -n "${GEMINI_API_KEY:-}" ]    || { echo "❌ GEMINI_API_KEY is not set"; exit 1; }
+      [ -n "${CI_JOB_TOKEN:-}" ]      || { echo "❌ CI_JOB_TOKEN is not available"; exit 1; }
       echo "Pulling Gemini CLI sandbox image: ${GEMINI_SANDBOX_IMAGE}"
       docker pull "${GEMINI_SANDBOX_IMAGE}"
     - | 
@@ -39,7 +40,7 @@ gemini_cli_code_review:
             "command": "node",
             "args": ["/workspace/gitlab-mcp-server.js"],
             "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_ACCESS_TOKEN}"
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}"
             }
           }
         }
@@ -61,7 +62,7 @@ gemini_cli_code_review:
         -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
         -e CI_MERGE_REQUEST_IID="${CI_MERGE_REQUEST_IID}" \
         -e CI_MERGE_REQUEST_PROJECT_URL="${CI_MERGE_REQUEST_PROJECT_URL}" \
-        -e GITLAB_ACCESS_TOKEN="${GITLAB_ACCESS_TOKEN}" \
+        -e CI_JOB_TOKEN="${CI_JOB_TOKEN}" \
         -v "${CI_PROJECT_DIR}:/workspace" \
         -v "/tmp/gemini_ci_script.sh:/gemini_ci_script.sh" \
         -w /workspace \
