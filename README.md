@@ -9,3 +9,6 @@ This project is set up to test the `.gitlab-ci.yml` configuration.
 3.  Trigger the CI/CD pipeline and verify that all actions execute as expected.
 
 Testing the CI pipeline again.
+
+
+Here is the test message. 
