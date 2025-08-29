@@ -19,23 +19,21 @@ gemini_cli_code_review:
       fi
       
     - |
-      echo "Downloading and extracting gitlab-mcp binary..."
-      GITLAB_MCP_VERSION="1.29.0"
-      curl -L -O "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz"
-      tar -xzf gitlab-mcp_${GITLAB_MCP_VERSION}_Linux_x86_64.tar.gz
-      chmod +x gitlab-mcp
+      echo "Installing MCP server dependencies..."
+      npm install
       
     - |
-      echo "Writing Gemini CLI settings..."
+      echo "Writing Gemini CLI settings with enhanced MCP server..."
       mkdir -p "$HOME/.gemini"
       cat <<EOF > "$HOME/.gemini/settings.json"
       {
         "coreTools": ["LSTool", "ReadFileTool", "GrepTool", "GlobTool", "ReadManyFilesTool"],
         "mcpServers": {
           "gitlab": {
-            "command": "${CI_PROJECT_DIR}/gitlab-mcp",
+            "command": "node",
+            "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
             "env": {
-              "GITLAB_TOKEN": "${CI_JOB_TOKEN}"
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}"
             },
             "timeout": 5000,
             "includeTools": [
@@ -43,13 +41,22 @@ gemini_cli_code_review:
               "discussion_list",
               "get_merge_request_changes",
               "get_merge_request_commits",
-              "get_merge_request_dependencies",
               "get_merge_request_participants",
-              "get_merge_request_reviewers",
               "get_merge_request",
-              "get_repository_file_contents",
+              "get_file_contents",
               "list_merge_request_diffs",
-              "list_project_merge_requests"
+              "list_merge_requests",
+              "create_or_update_file",
+              "create_merge_request",
+              "get_issue",
+              "get_pipeline_jobs",
+              "get_merge_request_pipelines",
+              "get_pipeline",
+              "list_pipelines",
+              "get_job_log",
+              "retry_pipeline",
+              "cancel_pipeline",
+              "trigger_pipeline"
             ]
           }
         }

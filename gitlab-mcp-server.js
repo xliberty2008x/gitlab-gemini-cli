@@ -254,6 +254,56 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["project_id", "ref"],
         },
       },
+      {
+        name: "discussion_add_note",
+        description: "Add a note/comment to a merge request discussion",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "The content of the note/comment" },
+            discussion_id: { type: "string", description: "Discussion ID (optional, for replying to existing discussion)" }
+          },
+          required: ["project_id", "merge_request_iid", "body"],
+        },
+      },
+      {
+        name: "discussion_list",
+        description: "List all discussions/comments in a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
+      {
+        name: "get_merge_request_participants",
+        description: "Get participants (users involved) in a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
+      {
+        name: "list_merge_request_diffs",
+        description: "List detailed diffs for a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
     ],
   };
 });
@@ -374,6 +424,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           body: JSON.stringify(triggerData),
         });
         return { content: [{ type: "text", text: JSON.stringify(triggerResult, null, 2) }] };
+
+      // NEW: Discussion/Comment tools handlers
+      case "discussion_add_note":
+        let noteEndpoint;
+        let noteData;
+        
+        if (args.discussion_id) {
+          // Reply to existing discussion
+          noteEndpoint = `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions/${args.discussion_id}/notes`;
+          noteData = { body: args.body };
+        } else {
+          // Create new discussion/comment
+          noteEndpoint = `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes`;
+          noteData = { body: args.body };
+        }
+        
+        const noteResult = await gitlabApi(noteEndpoint, {
+          method: "POST",
+          body: JSON.stringify(noteData),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(noteResult, null, 2) }] };
+
+      case "discussion_list":
+        const discussions = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`);
+        return { content: [{ type: "text", text: JSON.stringify(discussions, null, 2) }] };
+
+      case "get_merge_request_participants":
+        const participants = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/participants`);
+        return { content: [{ type: "text", text: JSON.stringify(participants, null, 2) }] };
+
+      case "list_merge_request_diffs":
+        const diffs = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/diffs`);
+        return { content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }] };
 
       default:
         throw new Error(`Unknown tool: ${name}`);
