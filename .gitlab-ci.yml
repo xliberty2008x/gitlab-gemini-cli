@@ -22,6 +22,13 @@ gemini_cli_code_review:
       npm install
       
     - |
+      echo "Testing MCP server manually..."
+      echo "Current directory contents:"
+      ls -la
+      echo "Testing if MCP server can start:"
+      GITLAB_PERSONAL_ACCESS_TOKEN="${CI_JOB_TOKEN}" GITLAB_API_URL="https://hs2git.ab-games.com/api/v4" timeout 10 node gitlab-mcp-server.js --version 2>&1 || echo "MCP server test completed"
+      
+    - |
       echo "Writing Gemini CLI settings with enhanced MCP server..."
       mkdir -p "$HOME/.gemini"
       cat <<EOF > "$HOME/.gemini/settings.json"
