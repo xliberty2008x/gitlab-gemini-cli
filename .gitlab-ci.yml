@@ -33,7 +33,10 @@ gemini_cli_code_review:
       mkdir -p "$HOME/.gemini"
       HEADER="JOB-TOKEN"
       TOKEN="${CI_JOB_TOKEN}"
-      if [ -n "${GITLAB_PERSONAL_ACCESS_TOKEN}" ]; then
+      if [ -n "${GITLAB_REVIEW_PAT}" ]; then
+        HEADER="PRIVATE-TOKEN"
+        TOKEN="${GITLAB_REVIEW_PAT}"
+      elif [ -n "${GITLAB_PERSONAL_ACCESS_TOKEN}" ]; then
         HEADER="PRIVATE-TOKEN"
         TOKEN="${GITLAB_PERSONAL_ACCESS_TOKEN}"
       fi
