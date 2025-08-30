@@ -3,8 +3,6 @@ stages:
 
 gemini_cli_code_review:
   stage: review
-  tags:
-    - macos
   variables:
     GITLAB_MCP_VERSION: "1.29.0"
   script:
