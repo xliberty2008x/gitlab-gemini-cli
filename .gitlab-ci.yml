@@ -14,35 +14,67 @@ gemini_cli_code_review:
         exit 1
       fi
     - |
+      set -euo pipefail
       echo "Downloading and extracting gitlab-mcp binary..."
       OS=$(uname -s)
       ARCH=$(uname -m)
       if [ "$OS" = "Darwin" ]; then
         if [ "$ARCH" = "x86_64" ]; then
-          BINARY_ARCH="macOS_x86_64"
+          BINARY_ARCHES=("macOS_x86_64" "Darwin_x86_64")
         elif [ "$ARCH" = "arm64" ]; then
-          BINARY_ARCH="macOS_arm64"
+          BINARY_ARCHES=("macOS_arm64" "Darwin_arm64" "macOS_universal")
+        else
+          BINARY_ARCHES=("macOS_universal")
         fi
       elif [ "$OS" = "Linux" ]; then
         if [ "$ARCH" = "x86_64" ]; then
-          BINARY_ARCH="Linux_x86_64"
+          BINARY_ARCHES=("Linux_x86_64")
         elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-          BINARY_ARCH="Linux_arm64"
+          BINARY_ARCHES=("Linux_arm64" "Linux_aarch64")
+        else
+          BINARY_ARCHES=("Linux_x86_64")
         fi
-      fi
-
-      if [ -z "$BINARY_ARCH" ]; then
-        echo "Unsupported OS/architecture: $OS/$ARCH"
+      else
+        echo "Unsupported OS: $OS"
         exit 1
       fi
 
-      curl -L -o gitlab-mcp.tar.gz "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_${BINARY_ARCH}.tar.gz"
-      tar -xzf gitlab-mcp.tar.gz
-      chmod +x gitlab-mcp
+      # Try multiple candidate asset names and extensions
+      URL_BASE="https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads"
+      rm -f gitlab-mcp.tar.gz gitlab-mcp.zip gitlab-mcp.gz || true
+      SUCCESS=0
+      for BA in "${BINARY_ARCHES[@]}"; do
+        for EXT in tar.gz zip gz; do
+          URL="${URL_BASE}/gitlab-mcp_${GITLAB_MCP_VERSION}_${BA}.${EXT}"
+          echo "Trying: $URL"
+          if curl -sfL -o "gitlab-mcp.${EXT}" "$URL"; then
+            echo "Downloaded asset: gitlab-mcp.${EXT}"
+            if [ "$EXT" = "tar.gz" ]; then
+              if tar -tzf gitlab-mcp.tar.gz >/dev/null 2>&1; then
+                tar -xzf gitlab-mcp.tar.gz && SUCCESS=1 && break 2
+              fi
+            elif [ "$EXT" = "zip" ]; then
+              if command -v unzip >/dev/null 2>&1; then
+                unzip -o gitlab-mcp.zip && SUCCESS=1 && break 2
+              fi
+            elif [ "$EXT" = "gz" ]; then
+              # single-file gzip
+              gunzip -c gitlab-mcp.gz > gitlab-mcp && chmod +x gitlab-mcp && SUCCESS=1 && break 2
+            fi
+          fi
+        done
+      done
+
+      if [ "$SUCCESS" -ne 1 ]; then
+        echo "Failed to download and extract gitlab-mcp for $OS/$ARCH"
+        exit 1
+      fi
+
+      chmod +x gitlab-mcp || true
     - |
       echo "Writing Gemini CLI settings..."
       mkdir -p "$HOME/.gemini"
-      cat > "$HOME/.gemini/settings.json" <<'EOF'
+      cat > "$HOME/.gemini/settings.json" <<EOF
       {
         "coreTools": ["LSTool", "ReadFileTool", "GrepTool", "GlobTool", "ReadManyFilesTool"],
         "mcpServers": {
@@ -70,7 +102,7 @@ gemini_cli_code_review:
       EOF
     - |
       echo "Performing Code Review with Gemini"
-      gemini --yolo <<'EOF'
+      gemini --yolo <<EOF
         Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
         Consider all the collaborator comments in the MR that explain the code.
 
