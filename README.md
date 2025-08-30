@@ -74,4 +74,3 @@ If repo is on GitHub:
 6. Create a new Pull Request
 
 
-HERE IS THE TEST MESSAGE
