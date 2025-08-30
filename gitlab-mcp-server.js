@@ -7,6 +7,7 @@ const fetch = require("node-fetch");
 
 const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://hs2git.ab-games.com/api/v4";
 const GITLAB_TOKEN = process.env.GITLAB_PERSONAL_ACCESS_TOKEN;
+const GITLAB_TOKEN_HEADER = process.env.GITLAB_TOKEN_HEADER || "Authorization"; // "JOB-TOKEN", "PRIVATE-TOKEN", or "Authorization"
 
 if (!GITLAB_TOKEN) {
   console.error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is required");
@@ -28,9 +29,14 @@ const server = new Server(
 // Helper function to make GitLab API calls
 async function gitlabApi(endpoint, options = {}) {
   const url = `${GITLAB_API_URL}${endpoint}`;
+  const authHeaders = (() => {
+    if (GITLAB_TOKEN_HEADER === "JOB-TOKEN") return { "JOB-TOKEN": GITLAB_TOKEN };
+    if (GITLAB_TOKEN_HEADER === "PRIVATE-TOKEN") return { "PRIVATE-TOKEN": GITLAB_TOKEN };
+    return { "Authorization": `Bearer ${GITLAB_TOKEN}` };
+  })();
   const response = await fetch(url, {
     headers: {
-      "Authorization": `Bearer ${GITLAB_TOKEN}`,
+      ...authHeaders,
       "Content-Type": "application/json",
       ...options.headers,
     },

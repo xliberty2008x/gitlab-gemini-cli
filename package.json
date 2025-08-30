@@ -2,6 +2,10 @@
   "name": "bridgetown",
   "version": "1.0.0",
   "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "node-fetch": "^2.6.11"
+  },
   "scripts": {
     "esbuild": "node esbuild.config.js --minify",
     "esbuild-dev": "node esbuild.config.js --watch"

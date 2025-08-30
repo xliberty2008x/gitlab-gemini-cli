@@ -37,12 +37,13 @@ gemini_cli_code_review:
         "mcpServers": {
           "gitlab": {
             "command": "node",
-            "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
-            "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}",
-              "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
-            },
-            "timeout": 5000,
+          "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
+          "env": {
+            "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}",
+            "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4",
+            "GITLAB_TOKEN_HEADER": "JOB-TOKEN"
+          },
+            "timeout": 15000,
             "includeTools": [
               "discussion_add_note", 
               "discussion_list",
