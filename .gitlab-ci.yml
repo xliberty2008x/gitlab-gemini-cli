@@ -3,117 +3,83 @@ stages:
 
 gemini_cli_code_review:
   stage: review
-  
-  # Use the official Gemini CLI sandbox image
-  image: us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.11
-
+  tags:
+    - macos
+  variables:
+    GITLAB_MCP_VERSION: "1.29.0"
   script:
     - echo "Starting the Gemini CLI job..."
-    
     - |
-      echo "Using API KEY Authentication"
       if [ -z "$GEMINI_API_KEY" ]; then
         echo "Error: The 'GEMINI_API_KEY' CI/CD variable is not set."
         echo "Please configure it in your project's Settings > CI/CD > Variables."
         exit 1
       fi
-      
-      echo "Installing MCP server dependencies..."
-      npm install
-      
     - |
-      echo "Testing MCP server manually (sanity):"
-      echo "Current directory contents:"
-      ls -la
-      # Simple node sanity check; the MCP server runs later via Gemini
-      node -v
-      
-    - |
-      echo "Writing Gemini CLI settings with enhanced MCP server..."
-      mkdir -p "$HOME/.gemini"
-      HEADER="JOB-TOKEN"
-      TOKEN="${CI_JOB_TOKEN}"
-      if [ -n "${GITLAB_REVIEW_PAT}" ]; then
-        HEADER="PRIVATE-TOKEN"
-        TOKEN="${GITLAB_REVIEW_PAT}"
-      elif [ -n "${GITLAB_PERSONAL_ACCESS_TOKEN}" ]; then
-        HEADER="PRIVATE-TOKEN"
-        TOKEN="${GITLAB_PERSONAL_ACCESS_TOKEN}"
+      echo "Downloading and extracting gitlab-mcp binary..."
+      OS=$(uname -s)
+      ARCH=$(uname -m)
+      if [ "$OS" = "Darwin" ]; then
+        if [ "$ARCH" = "x86_64" ]; then
+          BINARY_ARCH="macOS_x86_64"
+        elif [ "$ARCH" = "arm64" ]; then
+          BINARY_ARCH="macOS_arm64"
+        fi
+      elif [ "$OS" = "Linux" ]; then
+        if [ "$ARCH" = "x86_64" ]; then
+          BINARY_ARCH="Linux_x86_64"
+        elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+          BINARY_ARCH="Linux_arm64"
+        fi
       fi
-      cat <<EOF > "$HOME/.gemini/settings.json"
+
+      if [ -z "$BINARY_ARCH" ]; then
+        echo "Unsupported OS/architecture: $OS/$ARCH"
+        exit 1
+      fi
+
+      curl -L -o gitlab-mcp.tar.gz "https://gitlab.com/fforster/gitlab-mcp/-/releases/v${GITLAB_MCP_VERSION}/downloads/gitlab-mcp_${GITLAB_MCP_VERSION}_${BINARY_ARCH}.tar.gz"
+      tar -xzf gitlab-mcp.tar.gz
+      chmod +x gitlab-mcp
+    - |
+      echo "Writing Gemini CLI settings..."
+      mkdir -p "$HOME/.gemini"
+      cat > "$HOME/.gemini/settings.json" <<'EOF'
       {
         "coreTools": ["LSTool", "ReadFileTool", "GrepTool", "GlobTool", "ReadManyFilesTool"],
         "mcpServers": {
           "gitlab": {
-            "command": "node",
-            "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
+            "command": "${CI_PROJECT_DIR}/gitlab-mcp",
             "env": {
-              "GITLAB_PERSONAL_ACCESS_TOKEN": "${TOKEN}",
-              "GITLAB_TOKEN_HEADER": "${HEADER}",
+              "GITLAB_TOKEN": "${GITLAB_REVIEW_PAT}",
               "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
             },
-            "timeout": 15000,
+            "timeout": 5000,
             "includeTools": [
-              "discussion_add_note", 
+              "discussion_add_note",
               "discussion_list",
               "get_merge_request_changes",
               "get_merge_request_commits",
               "get_merge_request_participants",
               "get_merge_request",
-              "get_file_contents",
               "list_merge_request_diffs",
-              "list_merge_requests",
-              "create_or_update_file",
-              "create_merge_request",
-              "get_issue",
-              "get_pipeline_jobs",
-              "get_merge_request_pipelines",
-              "get_pipeline",
-              "list_pipelines",
-              "get_job_log",
-              "retry_pipeline",
-              "cancel_pipeline",
-              "trigger_pipeline"
+              "list_project_merge_requests",
+              "get_repository_file_contents"
             ]
           }
         }
       }
       EOF
-      
-    - |
-      echo "Debugging GitLab CI variables:"
-      echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"
-      echo "CI_PROJECT_ID: ${CI_PROJECT_ID}"
-      echo "CI_MERGE_REQUEST_IID: ${CI_MERGE_REQUEST_IID}"
-      echo "CI_MERGE_REQUEST_PROJECT_URL: ${CI_MERGE_REQUEST_PROJECT_URL}"
-      
     - |
       echo "Performing Code Review with Gemini"
-      # This runs in "yolo mode" because the pipeline runs non-interactively
-      gemini --yolo <<EOF
-        You are reviewing merge request ${CI_MERGE_REQUEST_IID} in GitLab project ID ${CI_PROJECT_ID}.
-        
-        Please:
-        1. Use get_merge_request with project_id="${CI_PROJECT_ID}" and merge_request_iid="${CI_MERGE_REQUEST_IID}" to get MR details
-        2. Use get_merge_request_changes to see what files were changed
-        3. Use get_merge_request_commits to see the commits
-        4. Use discussion_list to see existing comments (to avoid duplicates)
-        5. Then use discussion_add_note to post your review comments
-        
-        Provide a thorough code review with:
-        - A concise summary of the proposed changes
-        - A prioritized list of suggestions with specific code references
-        - Consider any existing comments or discussions
+      gemini --yolo <<'EOF'
+        Provide a consistent and thorough code review in Gitlab project ${CI_MERGE_REQUEST_PROJECT_URL} for the merge request ${CI_MERGE_REQUEST_IID}
+        Consider all the collaborator comments in the MR that explain the code.
+
+        Steps:
+        1. Add a comment to the MR with a concise summary of proposed change. Skip this if nothing has changed since you last provided a summary.
+        2. Add a comment to the MR with a prioritized list of suggestions and quoting the current code when possible. Reference your previous merge request comments if applicable.
       EOF
-      
-    - |
-      echo "Run at $(date)" > ai_review_report.md
 
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    
-  artifacts:
-    when: always
-    paths: [ai_review_report.md]
-    
-  allow_failure: true
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
