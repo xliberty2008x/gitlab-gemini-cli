@@ -22,27 +22,33 @@ gemini_cli_code_review:
       npm install
       
     - |
-      echo "Testing MCP server manually..."
+      echo "Testing MCP server manually (sanity):"
       echo "Current directory contents:"
       ls -la
-      echo "Testing if MCP server can start:"
-      GITLAB_PERSONAL_ACCESS_TOKEN="${CI_JOB_TOKEN}" GITLAB_API_URL="https://hs2git.ab-games.com/api/v4" timeout 10 node gitlab-mcp-server.js --version 2>&1 || echo "MCP server test completed"
+      # Simple node sanity check; the MCP server runs later via Gemini
+      node -v
       
     - |
       echo "Writing Gemini CLI settings with enhanced MCP server..."
       mkdir -p "$HOME/.gemini"
+      HEADER="JOB-TOKEN"
+      TOKEN="${CI_JOB_TOKEN}"
+      if [ -n "${GITLAB_PERSONAL_ACCESS_TOKEN}" ]; then
+        HEADER="PRIVATE-TOKEN"
+        TOKEN="${GITLAB_PERSONAL_ACCESS_TOKEN}"
+      fi
       cat <<EOF > "$HOME/.gemini/settings.json"
       {
         "coreTools": ["LSTool", "ReadFileTool", "GrepTool", "GlobTool", "ReadManyFilesTool"],
         "mcpServers": {
           "gitlab": {
             "command": "node",
-          "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
-          "env": {
-            "GITLAB_PERSONAL_ACCESS_TOKEN": "${CI_JOB_TOKEN}",
-            "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4",
-            "GITLAB_TOKEN_HEADER": "JOB-TOKEN"
-          },
+            "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
+            "env": {
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${TOKEN}",
+              "GITLAB_TOKEN_HEADER": "${HEADER}",
+              "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
+            },
             "timeout": 15000,
             "includeTools": [
               "discussion_add_note", 
@@ -82,10 +88,10 @@ gemini_cli_code_review:
       echo "Performing Code Review with Gemini"
       # This runs in "yolo mode" because the pipeline runs non-interactively
       gemini --yolo <<EOF
-        You are reviewing merge request ${CI_MERGE_REQUEST_IID} in GitLab project "${CI_PROJECT_PATH}" (ID: ${CI_PROJECT_ID}).
+        You are reviewing merge request ${CI_MERGE_REQUEST_IID} in GitLab project ID ${CI_PROJECT_ID}.
         
         Please:
-        1. Use get_merge_request with project_id="${CI_PROJECT_PATH}" and merge_request_iid="${CI_MERGE_REQUEST_IID}" to get MR details
+        1. Use get_merge_request with project_id="${CI_PROJECT_ID}" and merge_request_iid="${CI_MERGE_REQUEST_IID}" to get MR details
         2. Use get_merge_request_changes to see what files were changed
         3. Use get_merge_request_commits to see the commits
         4. Use discussion_list to see existing comments (to avoid duplicates)
