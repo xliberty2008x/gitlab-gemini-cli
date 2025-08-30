@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run Codex with project-scoped MCP config and credentials from .env.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Load .env if present (does not error if missing)
+if [ -f "${REPO_ROOT}/.env" ]; then
+  # shellcheck source=/dev/null
+  set -a
+  . "${REPO_ROOT}/.env"
+  set +a
+fi
+
+# Map common variables to what the MCP server expects
+# Prefer explicit env if already set by the user.
+export GITLAB_PERSONAL_ACCESS_TOKEN="${GITLAB_PERSONAL_ACCESS_TOKEN:-${GITLAB_ACCESS_TOKEN:-}}"
+export GITLAB_TOKEN_HEADER="${GITLAB_TOKEN_HEADER:-PRIVATE-TOKEN}"
+export GITLAB_API_URL="${GITLAB_API_URL:-https://hs2git.ab-games.com/api/v4}"
+
+# Point Codex to the repo-local config
+export CODEX_HOME="${REPO_ROOT}/.codex"
+
+exec codex "$@"
+

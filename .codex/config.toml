@@ -1,0 +1,11 @@
+model = "gpt-4o"
+model_provider = "openai"
+
+# Configure the GitLab MCP server for Codex.
+# Note: Codex reads this from $CODEX_HOME/config.toml. Use bin/codex-with-mcp to set CODEX_HOME.
+
+[mcp_servers.gitlab]
+command = "bash"
+args = ["-lc", "\"$(dirname $0)/../bin/gitlab-mcp\""]
+# No env values here; bin/codex-with-mcp sources .env and exports required vars.
+
