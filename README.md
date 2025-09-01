@@ -1,76 +1,31 @@
-# Bridgetown Template
+# GitLab MR Gemini Review
 
-Simple Bridgetown boilerplate for GitLab Pages
+Automated code review for GitLab Merge Requests using the Gemini CLI and an in‑repo MCP server.
 
-## Bridgetown Website README
+## Overview
+- Runs on `merge_request_event` and posts inline (anchored) comments plus a summary.
+- Uses the in‑repo MCP server (`gitlab-mcp-server.js`) with GitLab API auth via PAT.
+- CI prompt follows a GitHub‑style review flow adapted for GitLab.
 
-Welcome to your new Bridgetown website! You can update this README file to provide additional context and setup information for yourself or other contributors.
+## Quick Start
+1) Set CI/CD Variables in GitLab:
+   - `GEMINI_API_KEY` (masked)
+   - `GITLAB_REVIEW_PAT` (masked; unprotect for non‑protected branches during testing)
+   - Optional: `GITLAB_API_URL` for your instance
+2) Open an MR → the pipeline runs and posts review comments.
 
-## Table of Contents
+## Local Testing
+- Install deps: `npm install`
+- Run MCP server: `npm run mcp:serve`
+- The CI job config in `.gitlab-ci.yml` shows how settings.json is generated for Gemini CLI.
 
-- [Prerequisites](#prerequisites)
-- [Install](#install)
-- [Development](#development)
-- [Commands](#commands)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
+## Files
+- `.gitlab-ci.yml`: CI job, prompt, and MCP settings
+- `gitlab-mcp-server.js`: MCP server with tools for MR reads and discussions
+- `AGENTS.md`: contributor guide and roadmap
+- `SETUP.md`: end‑to‑end setup for new repos
+- `GEMINI.md`: guardrails (backlog to re‑enable)
 
-## Prerequisites
-
-- [GCC](https://gcc.gnu.org/install/)
-- [Make](https://www.gnu.org/software/make/)
-- [Ruby](https://www.ruby-lang.org/en/downloads/)
-  - `>= 2.7`
-- [Bridgetown Gem](https://rubygems.org/gems/bridgetown)
-  - `gem install bridgetown -N`
-- [Node](https://nodejs.org)
-  - `>= 12`
-- [Yarn](https://yarnpkg.com)
-
-## Install
-
-```sh
-cd bridgetown-site-folder
-bundle install && yarn install
-```
-> Learn more: [Bridgetown Getting Started Documentation](https://www.bridgetownrb.com/docs/).
-
-## Development
-
-To start your site in development mode, run `bin/bridgetown start` and navigate to [localhost:4000](https://localhost:4000/)!
-
-Use a [theme](https://github.com/topics/bridgetown-theme) or add some [plugins](https://www.bridgetownrb.com/plugins/) to get started quickly.
-
-### Commands
-
-```sh
-# running locally
-bin/bridgetown start
-
-# build & deploy to production
-bin/bridgetown deploy
-
-# load the site up within a Ruby console (IRB)
-bin/bridgetown console
-```
-
-> Learn more: [Bridgetown CLI Documentation](https://www.bridgetownrb.com/docs/command-line-usage)
-
-## Deployment
-
-You can deploy Bridgetown sites on hosts like Render or Vercel as well as traditional web servers by simply building and copying the output folder to your HTML root.
-
-> Read the [Bridgetown Deployment Documentation](https://www.bridgetownrb.com/docs/deployment) for more information.
-
-## Contributing
-
-If repo is on GitHub:
-
-1. Fork it
-2. Clone the fork using `git clone` to your local development machine.
-3. Create your feature branch (`git checkout -b my-new-feature`)
-4. Commit your changes (`git commit -am 'Add some feature'`)
-5. Push to the branch (`git push origin my-new-feature`)
-6. Create a new Pull Request
-
+## License
+See `LICENSE`.
 
