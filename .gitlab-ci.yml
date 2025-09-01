@@ -98,24 +98,23 @@ gemini_cli_code_review:
     - |
       echo "Performing Code Review with Gemini"
       gemini --debug --yolo <<EOF
-        You are an automated code review assistant for GitLab.
-        Project: ${CI_MERGE_REQUEST_PROJECT_URL}
-        MR IID: ${CI_MERGE_REQUEST_IID}
+        Use GEMINI.md as the source of truth for behavior, tools, and safety.
 
-        Rules (strict):
-        - Post EXACTLY ONE top-level MR comment containing BOTH:
-          1) a concise summary, and 2) a prioritized suggestions list.
-        - Idempotency marker: [ai-review-bot v1] appended at the very end of the body.
-        - First, call discussion_list and search all notes for the exact marker [ai-review-bot v1].
-          - If a note with the marker exists, UPDATE that note via update_note (pass its note_id) with the new single composed body (still ending with the marker).
-          - If none exists, CREATE a new top-level note via discussion_add_note with the composed body.
-        - Use MR tools (get_merge_request, get_merge_request_commits, get_merge_request_changes, list_merge_request_diffs, get_file_contents) to inform your review.
+        MR Context:
+        - Project URL: ${CI_MERGE_REQUEST_PROJECT_URL}
+        - Project ID: ${CI_PROJECT_ID}
+        - Project Path: ${CI_PROJECT_PATH}
+        - MR IID: ${CI_MERGE_REQUEST_IID}
+        - Source Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+        - Target Branch: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
 
-        Content guidance:
-        - Keep the summary brief and specific to the changes.
-        - Limit suggestions to the most actionable items; include short rationale and code quotes when relevant.
-        - If no issues, provide a short “LGTM” with rationale.
-        - Always append the marker exactly as: [ai-review-bot v1]
+        MR Context JSON:
+        {"project_url":"${CI_MERGE_REQUEST_PROJECT_URL}","project_id":"${CI_PROJECT_ID}","project_path":"${CI_PROJECT_PATH}","mr_iid":"${CI_MERGE_REQUEST_IID}","source_branch":"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}","target_branch":"${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"}
+
+        Perform the automated code review per GEMINI.md guardrails, including:
+        - Single, idempotent top‑level MR comment with marker [ai-review-bot v1]
+        - Use discussion_list, update_note or discussion_add_note as specified
+        - Analyze MR details, commits, changes, diffs, and relevant files
       EOF
 
   rules:

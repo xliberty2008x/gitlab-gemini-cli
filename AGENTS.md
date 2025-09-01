@@ -39,11 +39,19 @@
 - Required CI vars: `GEMINI_API_KEY` and `GITLAB_REVIEW_PAT` (maps to `GITLAB_PERSONAL_ACCESS_TOKEN`).
 - API URL: set to `https://hs2git.ab-games.com/api/v4`; override with `GITLAB_API_URL` if needed.
 - Token header: defaults to `Authorization`; CI sets `GITLAB_TOKEN_HEADER=PRIVATE-TOKEN` for PATs.
-- Tools: comments (`discussion_add_note`, `discussion_list`), MR reads (`get_merge_request*`, diffs, participants), file ops (`get_file_contents`, `create_or_update_file`).
- - Tools (comments): `discussion_add_note`, `discussion_list`, and `update_note` (edit existing MR note by ID).
+- Tools: comments (`discussion_add_note`, `discussion_list`, `update_note`), MR reads (`get_merge_request*`, diffs, participants), file ops (`get_file_contents`, `create_or_update_file`).
 - Runner image: Docker runner with `image: node:20-alpine`; installs `@google/gemini-cli` via npm and project deps via `npm install --omit=dev`.
-- Idempotency: the review comment includes marker `[ai-review-bot v1]`; pipeline lists discussions first and skips posting if a comment with this marker already exists.
- - Update-in-place: if a prior bot comment with the marker is found, the job updates it via `update_note` instead of posting a new one.
+- Idempotency: the review comment includes marker `[ai-review-bot v1]`; job lists discussions and updates in-place via `update_note` if a prior comment exists.
+
+## GEMINI.md Guardrails
+- Source of truth for behavior, tools, idempotency marker, and comment format.
+- Single comment policy: maintain exactly one MR comment with `[ai-review-bot v1]` using `discussion_list` + `update_note`.
+- Suggestions: short, actionable bullets; quote code when relevant; “LGTM” path when no issues.
+
+## Prompt & Variables
+- Minimal prompt passes MR context and directs the agent to follow `GEMINI.md`.
+- Variables passed: `CI_MERGE_REQUEST_PROJECT_URL`, `CI_PROJECT_ID`, `CI_PROJECT_PATH`, `CI_MERGE_REQUEST_IID`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`.
+- JSON context is embedded in the prompt for robust parsing.
 
 ## CI Setup Status & Troubleshooting
 - Progress: CI installs Gemini CLI (Docker or macOS shell runner), launches in-repo MCP via stdio with PAT auth. Server updated for default-branch detection and safe file updates.
