@@ -81,7 +81,7 @@ gemini_cli_code_review:
             "includeTools": [
               "discussion_add_note",
               "discussion_list",
-              "update_note",
+              "create_mr_discussion_with_position",
               "get_merge_request_changes",
               "get_merge_request_commits",
               "get_merge_request_participants",
@@ -98,23 +98,34 @@ gemini_cli_code_review:
     - |
       echo "Performing Code Review with Gemini"
       gemini --debug --yolo <<EOF
-        Use GEMINI.md as the source of truth for behavior, tools, and safety.
+        Role: You are an automated GitLab code review assistant. Provide concise, actionable feedback tied to the current merge request.
 
-        MR Context:
+        Context:
+        - Repository: ${CI_PROJECT_PATH}
         - Project URL: ${CI_MERGE_REQUEST_PROJECT_URL}
         - Project ID: ${CI_PROJECT_ID}
-        - Project Path: ${CI_PROJECT_PATH}
         - MR IID: ${CI_MERGE_REQUEST_IID}
+        - Commit SHA: ${CI_COMMIT_SHA}
         - Source Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
         - Target Branch: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
 
-        MR Context JSON:
-        {"project_url":"${CI_MERGE_REQUEST_PROJECT_URL}","project_id":"${CI_PROJECT_ID}","project_path":"${CI_PROJECT_PATH}","mr_iid":"${CI_MERGE_REQUEST_IID}","source_branch":"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}","target_branch":"${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"}
+        MR_CONTEXT (JSON):
+        {"project_id":"${CI_PROJECT_ID}","project_path":"${CI_PROJECT_PATH}","mr_iid":"${CI_MERGE_REQUEST_IID}","commit_sha":"${CI_COMMIT_SHA}","source_branch":"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}","target_branch":"${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"}
 
-        Perform the automated code review per GEMINI.md guardrails, including:
-        - Single, idempotent top‑level MR comment with marker [ai-review-bot v1]
-        - Use discussion_list, update_note or discussion_add_note as specified
-        - Analyze MR details, commits, changes, diffs, and relevant files
+        Rules & Constraints:
+        - Always use MR_CONTEXT values exactly for MCP tool parameters (no guessing).
+        - First, validate access by calling get_merge_request with project_id and mr_iid from MR_CONTEXT. If it fails, post a single top-level diagnostic note via discussion_add_note and exit.
+        - Fetch MR commits, changes, and diffs using get_merge_request_commits, get_merge_request_changes, and list_merge_request_diffs.
+        - Post exactly one new MR comment per run:
+          - Preferred: create an anchored discussion using create_mr_discussion_with_position with a valid position object derived from MR diff_refs (base_sha, start_sha, head_sha) and a changed file/line.
+          - Fallback: if anchoring is not possible, post one top-level note via discussion_add_note. Do not update or edit prior comments.
+        - Keep output brief: a 1-paragraph summary and 3–6 prioritized suggestions with short rationale; quote code when relevant.
+        - Treat tool errors as fatal; do not claim success if posting fails.
+
+        Output:
+        - A single MR comment (anchored discussion preferred) containing:
+          - Summary: short description of the proposed change
+          - Suggestions: prioritized, actionable bullets (2–6) with brief rationale
       EOF
 
   rules:

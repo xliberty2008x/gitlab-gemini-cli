@@ -39,19 +39,29 @@
 - Required CI vars: `GEMINI_API_KEY` and `GITLAB_REVIEW_PAT` (maps to `GITLAB_PERSONAL_ACCESS_TOKEN`).
 - API URL: set to `https://hs2git.ab-games.com/api/v4`; override with `GITLAB_API_URL` if needed.
 - Token header: defaults to `Authorization`; CI sets `GITLAB_TOKEN_HEADER=PRIVATE-TOKEN` for PATs.
-- Tools: comments (`discussion_add_note`, `discussion_list`, `update_note`), MR reads (`get_merge_request*`, diffs, participants), file ops (`get_file_contents`, `create_or_update_file`).
+- Tools: comments (`discussion_add_note`, `discussion_list`, `create_mr_discussion_with_position`), MR reads (`get_merge_request*`, diffs, participants), file ops (`get_file_contents`, `create_or_update_file`).
 - Runner image: Docker runner with `image: node:20-alpine`; installs `@google/gemini-cli` via npm and project deps via `npm install --omit=dev`.
 - Idempotency: the review comment includes marker `[ai-review-bot v1]`; job lists discussions and updates in-place via `update_note` if a prior comment exists.
 
-## GEMINI.md Guardrails
-- Source of truth for behavior, tools, idempotency marker, and comment format.
-- Single comment policy: maintain exactly one MR comment with `[ai-review-bot v1]` using `discussion_list` + `update_note`.
-- Suggestions: short, actionable bullets; quote code when relevant; “LGTM” path when no issues.
+## Prompt-in-CI Strategy
+- The CI job embeds the full review prompt (adapted from GitHub example) and passes MR context and JSON MR_CONTEXT.
+- Behavior: post exactly one new MR comment per run; prefer an anchored discussion via `create_mr_discussion_with_position`, fallback to a top-level note.
+- Strict param sourcing: tools must use MR_CONTEXT fields exactly; no guessing.
 
 ## Prompt & Variables
-- Minimal prompt passes MR context and directs the agent to follow `GEMINI.md`.
-- Variables passed: `CI_MERGE_REQUEST_PROJECT_URL`, `CI_PROJECT_ID`, `CI_PROJECT_PATH`, `CI_MERGE_REQUEST_IID`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`.
-- JSON context is embedded in the prompt for robust parsing.
+- Prompt includes: repo path, MR URL/IID, commit SHA, source/target branches.
+- Variables passed: `CI_MERGE_REQUEST_PROJECT_URL`, `CI_PROJECT_ID`, `CI_PROJECT_PATH`, `CI_MERGE_REQUEST_IID`, `CI_COMMIT_SHA`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`.
+- JSON MR_CONTEXT embedded for robust parsing.
+
+## Backlog
+- GEMINI.md as primary guardrails (deferred): centralize behavior and safety rules outside CI.
+- Commit comments tool: `add_commit_comment` for commit-scoped notes if desired later.
+
+## Roadmap & Tasks
+- MCP robustness: implement typed `GitLabApiError` in `gitlab-mcp-server.js` (include `status`, `statusText`, `body`). In `create_or_update_file`, POST only on `status === 404`, otherwise rethrow.
+- CI readability: extract OS/CLI setup to `scripts/setup_ci.sh` and call it from `.gitlab-ci.yml`; prefer `npm ci` when `package-lock.json` exists; consider `cache:` keyed by lockfile.
+- Production image: build a custom Docker image (Node 20-alpine) preinstalled with pinned `@google/gemini-cli` and project deps; run as non‑root; publish to registry and set `image:` in CI for Docker runners.
+- Validation: add MR tests for file exists vs not‑found; verify macOS Shell and Docker paths; check single‑comment idempotency and measure pipeline time before/after custom image.
 
 ## CI Setup Status & Troubleshooting
 - Progress: CI installs Gemini CLI (Docker or macOS shell runner), launches in-repo MCP via stdio with PAT auth. Server updated for default-branch detection and safe file updates.

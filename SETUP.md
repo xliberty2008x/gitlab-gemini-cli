@@ -36,11 +36,12 @@
 - Installs `@google/gemini-cli@0.2.2` and project deps.
 - Writes `~/.gemini/settings.json` to spawn the in‑repo MCP via stdio:
   - Env: `GITLAB_PERSONAL_ACCESS_TOKEN=$GITLAB_REVIEW_PAT`, `GITLAB_API_URL=…`, `GITLAB_TOKEN_HEADER=PRIVATE-TOKEN`.
-- Runs a non‑interactive review guided by `GEMINI.md` guardrails:
-  - Fetches MR details/commits/changes via MCP tools.
-  - Posts exactly one top‑level MR comment with summary + suggestions.
-  - Idempotent: searches for marker `[ai-review-bot v1]`; updates existing comment via `update_note`, or creates one if missing.
-  - MR variables are passed in the prompt (both plain text and a small JSON block) for robust parsing.
+- Runs a non‑interactive review using a prompt embedded in CI (GitHub-style):
+  - Fetches MR details/commits/changes/diffs via MCP tools.
+  - Posts exactly one new MR comment per run:
+    - Prefer an anchored discussion via `create_mr_discussion_with_position` (position from MR diff_refs + diffs).
+    - Fallback: a single top-level note if anchoring isn’t possible.
+  - MR variables are passed in the prompt (plain text + JSON MR_CONTEXT) for robust parsing.
 
 ## 5) Trigger & Validate
 - Open an MR (feature → `main`).
@@ -60,6 +61,7 @@
 ## 8) Troubleshooting
 - `gemini: not found` (Shell runner): ensure Node 20+ installed; CI installs CLI via npm.
 - 401/403 from MCP: check PAT scope, `GITLAB_API_URL`, and project access.
-- Duplicate comments: ensure the updated prompt with marker `[ai-review-bot v1]` is present.
+- Duplicate comments: each run posts one new comment by design (no updates). If you see more than one per run, check the prompt rules and tool call flow.
+ - Anchoring failures: pipeline will fall back to a top-level note; verify diff_refs and position object.
 - GEMINI.md not applied: verify the job runs at repo root so Gemini CLI can auto-load `GEMINI.md`; keep the prompt minimal and defer to `GEMINI.md` for rules.
 - Protected variables not injected: uncheck “Protected” for PAT during MR testing, or protect the MR source branches.

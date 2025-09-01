@@ -324,6 +324,34 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["project_id", "merge_request_iid"],
         },
       },
+      {
+        name: "create_mr_discussion_with_position",
+        description: "Create a new MR discussion anchored to a specific diff position",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "Discussion body text" },
+            position: {
+              type: "object",
+              description: "GitLab diff position object",
+              properties: {
+                position_type: { type: "string", enum: ["text", "image"], description: "Position type" },
+                base_sha: { type: "string" },
+                start_sha: { type: "string" },
+                head_sha: { type: "string" },
+                new_path: { type: "string" },
+                old_path: { type: "string" },
+                new_line: { type: "number" },
+                old_line: { type: "number" }
+              },
+              required: ["position_type", "base_sha", "start_sha", "head_sha"],
+            }
+          },
+          required: ["project_id", "merge_request_iid", "body", "position"],
+        },
+      },
     ],
   };
 });
@@ -504,6 +532,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "list_merge_request_diffs":
         const diffs = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/diffs`);
         return { content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }] };
+
+      case "create_mr_discussion_with_position": {
+        const payload = {
+          body: args.body,
+          position: args.position,
+        };
+        const created = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] };
+      }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
