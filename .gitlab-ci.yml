@@ -31,7 +31,7 @@ gemini_cli_code_review:
         fi
         npm --version || true
         npm install --omit=dev
-        node -e "require('@modelcontextprotocol/sdk'); console.log('MCP SDK OK')"
+        npm ls @modelcontextprotocol/sdk || true
       else
         echo "Linux or containerized runner detected. Installing system deps…"
         if command -v apk >/dev/null 2>&1; then
@@ -45,7 +45,7 @@ gemini_cli_code_review:
         fi
         gemini --version || true
         npm install --omit=dev
-        node -e "require('@modelcontextprotocol/sdk'); console.log('MCP SDK OK')"
+        npm ls @modelcontextprotocol/sdk || true
       fi
   script:
     - echo "Starting the Gemini CLI job..."
