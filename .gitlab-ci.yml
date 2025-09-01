@@ -4,6 +4,8 @@ stages:
 gemini_cli_code_review:
   stage: review
   image: node:20-alpine
+  variables:
+    GEMINI_CLI_VERSION: "0.2.2"
   before_script:
     - set -euo pipefail
     - echo "Detecting runner OS…"
@@ -11,16 +13,6 @@ gemini_cli_code_review:
     - |
       if [ "${OS}" = "Darwin" ]; then
         echo "Shell runner on macOS detected. Ensuring prerequisites via Homebrew…"
-        if ! command -v gemini >/dev/null 2>&1; then
-          if command -v brew >/dev/null 2>&1; then
-            brew update || true
-            brew install gemini-cli || brew upgrade gemini-cli || true
-          else
-            echo "Homebrew not found. Please install gemini-cli on the runner host or install Homebrew." >&2
-            exit 1
-          fi
-        fi
-        gemini --version || true
         if ! command -v node >/dev/null 2>&1; then
           if command -v brew >/dev/null 2>&1; then
             brew install node@20 || brew install node || true
@@ -30,6 +22,9 @@ gemini_cli_code_review:
           fi
         fi
         npm --version || true
+        echo "Installing pinned Gemini CLI ${GEMINI_CLI_VERSION}…"
+        npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
+        gemini --version || true
         npm install --omit=dev
         npm ls @modelcontextprotocol/sdk || true
       else
@@ -39,10 +34,8 @@ gemini_cli_code_review:
         elif command -v apt-get >/dev/null 2>&1; then
           apt-get update && apt-get install -y ca-certificates curl bash && rm -rf /var/lib/apt/lists/*
         fi
-        if ! command -v gemini >/dev/null 2>&1; then
-          echo "Installing Gemini CLI…"
-          npm install -g @google/gemini-cli@latest
-        fi
+        echo "Installing pinned Gemini CLI ${GEMINI_CLI_VERSION}…"
+        npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
         gemini --version || true
         npm install --omit=dev
         npm ls @modelcontextprotocol/sdk || true
@@ -103,16 +96,25 @@ gemini_cli_code_review:
       EOF
     - |
       echo "Performing Code Review with Gemini"
-      gemini --debug --yolo <<EOF
+      gemini --debug --yolo <<'EOF'
         You are an automated code review assistant for GitLab.
-        Target project: ${CI_MERGE_REQUEST_PROJECT_URL}
-        Target MR IID: ${CI_MERGE_REQUEST_IID}
+        Project: ${CI_MERGE_REQUEST_PROJECT_URL}
+        MR IID: ${CI_MERGE_REQUEST_IID}
 
-        Goals:
-        - Retrieve MR details, commits, and changes using available GitLab MCP tools.
-        - Post a concise summary comment to the MR with key findings.
-        - Post a prioritized list of suggestions, quoting current code when relevant.
-        - If no issues are found, post a short LGTM comment with rationale.
+        Rules (strict):
+        - Post exactly ONE top-level MR comment containing BOTH:
+          1) a concise summary, and 2) a prioritized suggestions list.
+        - Use the idempotency marker: [ai-review-bot v1] at the very end of your comment body.
+        - Before posting, call the MCP tool discussion_list to fetch existing discussions.
+          - If any existing note contains the exact marker [ai-review-bot v1], DO NOT post again. Exit cleanly.
+        - Use MR tools (get_merge_request, get_merge_request_commits, get_merge_request_changes, list_merge_request_diffs, get_file_contents) to inform your review.
+        - When posting, use discussion_add_note with the single composed body including the marker.
+
+        Content guidance:
+        - Keep the summary brief and specific to the changes.
+        - Limit suggestions to the most actionable items; include short rationale and code quotes when relevant.
+        - If no issues, provide a short “LGTM” with rationale.
+        - Append the marker exactly as: [ai-review-bot v1]
       EOF
 
   rules:
