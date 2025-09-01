@@ -38,10 +38,12 @@
   - Env: `GITLAB_PERSONAL_ACCESS_TOKEN=$GITLAB_REVIEW_PAT`, `GITLAB_API_URL=…`, `GITLAB_TOKEN_HEADER=PRIVATE-TOKEN`.
 - Runs a non‑interactive review using a prompt embedded in CI (GitHub-style):
   - Fetches MR details/commits/changes/diffs via MCP tools.
-  - Posts exactly one new MR comment per run:
-    - Prefer an anchored discussion via `create_mr_discussion_with_position` (position from MR diff_refs + diffs).
-    - Fallback: a single top-level note if anchoring isn’t possible.
+  - Posts exactly one new MR review per run:
+    - For issues (≤5): create anchored discussions via `create_mr_discussion_with_position` (use diff_refs + diffs to compute position).
+    - Then post one top-level summary note.
+    - Fallback: if anchoring fails, post a single top-level note with consolidated feedback.
   - MR variables are passed in the prompt (plain text + JSON MR_CONTEXT) for robust parsing.
+  - Concurrency: `resource_group` prevents overlapping runs for the same MR.
 
 ## 5) Trigger & Validate
 - Open an MR (feature → `main`).

@@ -47,11 +47,13 @@
 - The CI job embeds the full review prompt (adapted from GitHub example) and passes MR context and JSON MR_CONTEXT.
 - Behavior: post exactly one new MR comment per run; prefer an anchored discussion via `create_mr_discussion_with_position`, fallback to a top-level note.
 - Strict param sourcing: tools must use MR_CONTEXT fields exactly; no guessing.
+ - Concurrency: job uses `resource_group: gemini-review-$CI_MERGE_REQUEST_IID` to avoid overlapping runs.
 
 ## Prompt & Variables
 - Prompt includes: repo path, MR URL/IID, commit SHA, source/target branches.
 - Variables passed: `CI_MERGE_REQUEST_PROJECT_URL`, `CI_PROJECT_ID`, `CI_PROJECT_PATH`, `CI_MERGE_REQUEST_IID`, `CI_COMMIT_SHA`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`.
 - JSON MR_CONTEXT embedded for robust parsing.
+ - Severity levels: 🔴/🟠/🟡/🟢 included; suggestion blocks must be syntactically correct and aligned to diff lines.
 
 ## Backlog
 - GEMINI.md as primary guardrails (deferred): centralize behavior and safety rules outside CI.
