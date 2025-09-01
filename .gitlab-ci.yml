@@ -81,6 +81,7 @@ gemini_cli_code_review:
             "includeTools": [
               "discussion_add_note",
               "discussion_list",
+              "update_note",
               "get_merge_request_changes",
               "get_merge_request_commits",
               "get_merge_request_participants",
@@ -96,7 +97,7 @@ gemini_cli_code_review:
       EOF
     - |
       echo "Performing Code Review with Gemini"
-      gemini --debug --yolo <<'EOF'
+      gemini --debug --yolo <<EOF
         You are an automated code review assistant for GitLab.
         Project: ${CI_MERGE_REQUEST_PROJECT_URL}
         MR IID: ${CI_MERGE_REQUEST_IID}
