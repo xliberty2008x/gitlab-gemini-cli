@@ -343,22 +343,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const issue = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/issues/${args.issue_iid}`);
         return { content: [{ type: "text", text: JSON.stringify(issue, null, 2) }] };
 
-      case "get_file_contents":
-        const file = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${args.ref || 'main'}`);
+      case "get_file_contents": {
+        let ref = args.ref;
+        if (!ref) {
+          try {
+            const project = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}`);
+            ref = project.default_branch || 'main';
+          } catch (error) {
+            ref = 'main';
+          }
+        }
+        const file = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${ref}`);
         const content = Buffer.from(file.content, 'base64').toString('utf8');
         return { content: [{ type: "text", text: content }] };
+      }
 
-      case "create_or_update_file":
+      case "create_or_update_file": {
+        let method = "POST";
+        try {
+          await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${args.branch}`);
+          method = "PUT";
+        } catch (error) {
+          // If GET fails, assume file doesn't exist and create via POST
+        }
         const fileData = {
           branch: args.branch,
           commit_message: args.commit_message,
           content: args.content,
         };
         const result = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}`, {
-          method: "POST",
+          method,
           body: JSON.stringify(fileData),
         });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
 
       case "create_merge_request":
         const mrData = {
@@ -394,19 +412,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const pipelines = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/pipelines?${pipelineParams}`);
         return { content: [{ type: "text", text: JSON.stringify(pipelines, null, 2) }] };
 
-      case "get_job_log":
+      case "get_job_log": {
         // Job logs return plain text, not JSON
         const logUrl = `${GITLAB_API_URL}/projects/${encodeURIComponent(args.project_id)}/jobs/${args.job_id}/trace`;
-        const logResponse = await fetch(logUrl, {
-          headers: {
-            "Authorization": `Bearer ${GITLAB_TOKEN}`,
-          },
-        });
+        const authHeaders = (() => {
+          if (GITLAB_TOKEN_HEADER === "JOB-TOKEN") return { "JOB-TOKEN": GITLAB_TOKEN };
+          if (GITLAB_TOKEN_HEADER === "PRIVATE-TOKEN") return { "PRIVATE-TOKEN": GITLAB_TOKEN };
+          return { "Authorization": `Bearer ${GITLAB_TOKEN}` };
+        })();
+        const logResponse = await fetch(logUrl, { headers: { ...authHeaders } });
         if (!logResponse.ok) {
           throw new Error(`GitLab API error: ${logResponse.status} ${logResponse.statusText}`);
         }
         const logText = await logResponse.text();
         return { content: [{ type: "text", text: logText }] };
+      }
 
       case "retry_pipeline":
         const retryResult = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/pipelines/${args.pipeline_id}/retry`, {
