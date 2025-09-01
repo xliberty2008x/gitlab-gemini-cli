@@ -275,6 +275,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "update_note",
+        description: "Update an existing merge request note by ID",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            note_id: { type: "string", description: "Note ID to update" },
+            body: { type: "string", description: "New content for the note" },
+          },
+          required: ["project_id", "merge_request_iid", "note_id", "body"],
+        },
+      },
+      {
         name: "discussion_list",
         description: "List all discussions/comments in a merge request",
         inputSchema: {
@@ -475,6 +489,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "discussion_list":
         const discussions = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`);
         return { content: [{ type: "text", text: JSON.stringify(discussions, null, 2) }] };
+
+      case "update_note":
+        const updated = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes/${args.note_id}`, {
+          method: "PUT",
+          body: JSON.stringify({ body: args.body }),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
 
       case "get_merge_request_participants":
         const participants = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/participants`);

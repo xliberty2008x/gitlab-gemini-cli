@@ -102,19 +102,19 @@ gemini_cli_code_review:
         MR IID: ${CI_MERGE_REQUEST_IID}
 
         Rules (strict):
-        - Post exactly ONE top-level MR comment containing BOTH:
+        - Post EXACTLY ONE top-level MR comment containing BOTH:
           1) a concise summary, and 2) a prioritized suggestions list.
-        - Use the idempotency marker: [ai-review-bot v1] at the very end of your comment body.
-        - Before posting, call the MCP tool discussion_list to fetch existing discussions.
-          - If any existing note contains the exact marker [ai-review-bot v1], DO NOT post again. Exit cleanly.
+        - Idempotency marker: [ai-review-bot v1] appended at the very end of the body.
+        - First, call discussion_list and search all notes for the exact marker [ai-review-bot v1].
+          - If a note with the marker exists, UPDATE that note via update_note (pass its note_id) with the new single composed body (still ending with the marker).
+          - If none exists, CREATE a new top-level note via discussion_add_note with the composed body.
         - Use MR tools (get_merge_request, get_merge_request_commits, get_merge_request_changes, list_merge_request_diffs, get_file_contents) to inform your review.
-        - When posting, use discussion_add_note with the single composed body including the marker.
 
         Content guidance:
         - Keep the summary brief and specific to the changes.
         - Limit suggestions to the most actionable items; include short rationale and code quotes when relevant.
         - If no issues, provide a short “LGTM” with rationale.
-        - Append the marker exactly as: [ai-review-bot v1]
+        - Always append the marker exactly as: [ai-review-bot v1]
       EOF
 
   rules:
