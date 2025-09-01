@@ -43,8 +43,8 @@
 - Runner image: Docker runner with `image: node:20-alpine`; installs `@google/gemini-cli` via npm and project deps via `npm install --omit=dev`.
 
 ## CI Setup Status & Troubleshooting
-- Progress: switched CI to Docker image, install Gemini CLI at runtime, and launch in-repo MCP via stdio with PAT auth. Server updated for default-branch detection and safe file updates.
+- Progress: CI installs Gemini CLI (Docker or macOS shell runner), launches in-repo MCP via stdio with PAT auth. Server updated for default-branch detection and safe file updates.
 - Variables: ensure `GEMINI_API_KEY` and `GITLAB_REVIEW_PAT` are defined in GitLab CI/CD Variables; optionally set `GITLAB_API_URL` per environment.
-- Runner: requires Docker executor or preinstalled `gemini` on shell runners. Current job installs CLI each run for consistency.
+- Runner: if Docker executor, uses `node:20-alpine` and installs CLI via npm; if macOS shell runner, uses Homebrew (`brew install gemini-cli`) when `gemini` is missing.
 - Common issues: “gemini: not found” → image missing install step; “403/401” → invalid PAT or wrong `GITLAB_API_URL`; MR comments missing → verify MCP tools list and token scope (api).
 - Next: consider pinning CLI version (e.g., `@google/gemini-cli@1.x`) and adding `allow_failure: true` during initial testing. For production, you can pre-bake a custom image with CLI installed.
