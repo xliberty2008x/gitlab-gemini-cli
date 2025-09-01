@@ -82,7 +82,7 @@ gemini_cli_code_review:
             "includeTools": [
               "discussion_add_note",
               "discussion_list",
-              "create_mr_discussion_with_position",
+              "create_anchored_discussion_auto",
               "get_merge_request_changes",
               "get_merge_request_commits",
               "get_merge_request_participants",
@@ -98,7 +98,7 @@ gemini_cli_code_review:
       EOF
     - |
       echo "Performing Code Review with Gemini"
-      gemini --debug --yolo <<EOF
+      cat > "${CI_PROJECT_DIR}/prompt.tmpl" <<'PROMPT'
         ## Role
 
         You are a world-class autonomous code review agent operating in a secure GitLab CI environment. Your analysis is precise, constructive, and strictly adheres to instructions. You are tasked with reviewing a GitLab Merge Request (MR).
@@ -142,8 +142,7 @@ gemini_cli_code_review:
         - Collect changes/diffs and review the code according to the Review Criteria.
 
         Step 2: Formulate Review Comments (Anchored Discussions)
-        - For each identified issue (max 5), create an anchored MR discussion using create_mr_discussion_with_position.
-          - Build a valid position object using MR diff_refs (base_sha, start_sha, head_sha) and a changed file path and line (new_line or old_line) from the diff.
+        - For each identified issue (max 5), create an anchored MR discussion using create_anchored_discussion_auto (server resolves a valid position).
           - Each comment MUST include a severity and optional code suggestion block.
 
         Severity Levels (Mandatory):
@@ -183,7 +182,8 @@ gemini_cli_code_review:
 
         - Post exactly one new anchored discussion per identified issue (up to 5), then one top-level summary note. If anchoring fails for all issues, post a single top-level note with consolidated feedback.
         - Treat tool errors as fatal; do not claim success if posting fails.
-      EOF
+      PROMPT
+      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --debug --yolo
 
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

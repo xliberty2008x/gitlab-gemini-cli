@@ -325,6 +325,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "create_anchored_discussion_auto",
+        description: "Create a new MR discussion anchored to the first added line in the latest diffs. Falls back to top-level note on failure.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "Discussion body text" }
+          },
+          required: ["project_id", "merge_request_iid", "body"],
+        },
+      },
+      {
         name: "create_mr_discussion_with_position",
         description: "Create a new MR discussion anchored to a specific diff position",
         inputSchema: {
@@ -532,6 +545,87 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "list_merge_request_diffs":
         const diffs = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/diffs`);
         return { content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }] };
+
+      case "create_anchored_discussion_auto": {
+        // Helper to parse unified diffs and find the first added new_line
+        function findFirstAddedLine(diffText) {
+          if (!diffText) return null;
+          const lines = diffText.split(/\r?\n/);
+          let currentNew = null;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.startsWith('@@')) {
+              // Example: @@ -a,b +c,d @@ or @@ -a +c @@
+              const m = /@@\s-\d+(?:,\d+)?\s\+(\d+)(?:,\d+)?\s@@/.exec(line);
+              if (m) currentNew = parseInt(m[1], 10) - 1; // will increment on context/+ lines
+              continue;
+            }
+            if (currentNew === null) continue;
+            if (line.startsWith('--- ') || line.startsWith('+++ ')) continue; // headers
+            if (line.startsWith('+')) {
+              currentNew += 1;
+              // Skip file header lines like +++ which we filtered; return the first added code line
+              return currentNew;
+            } else if (line.startsWith(' ')) {
+              currentNew += 1; // context advances new line count
+            } else if (line.startsWith('-')) {
+              // removed line: advances old only, not new
+            } else {
+              // unknown; ignore
+            }
+          }
+          return null;
+        }
+
+        try {
+          // Fetch MR for diff_refs
+          const mr = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}`);
+          const refs = mr && mr.diff_refs ? mr.diff_refs : null;
+          if (!refs || !refs.base_sha || !refs.start_sha || !refs.head_sha) {
+            throw new Error('Missing diff_refs for MR; cannot anchor');
+          }
+
+          // Fetch changes to get per-file unified diffs
+          const changesResp = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/changes`);
+          const changes = (changesResp && changesResp.changes) || [];
+          let position = null;
+          for (const ch of changes) {
+            const diffText = ch.diff || ch.patch || '';
+            const newLine = findFirstAddedLine(diffText);
+            const newPath = ch.new_path || ch.newFile || ch.new_path; // prefer new_path
+            if (newLine && newPath) {
+              position = {
+                position_type: 'text',
+                base_sha: refs.base_sha,
+                start_sha: refs.start_sha,
+                head_sha: refs.head_sha,
+                new_path: newPath,
+                new_line: newLine,
+              };
+              break;
+            }
+          }
+
+          if (!position) {
+            throw new Error('Could not determine a valid added line to anchor');
+          }
+
+          const payload = { body: args.body, position };
+          const created = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          return { content: [{ type: 'text', text: JSON.stringify(created, null, 2) }] };
+        } catch (e) {
+          // Fallback to top-level note
+          const noteBody = `${args.body}\n\n_(Auto-anchoring unavailable: ${e.message})_`;
+          const note = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes`, {
+            method: 'POST',
+            body: JSON.stringify({ body: noteBody }),
+          });
+          return { content: [{ type: 'text', text: JSON.stringify(note, null, 2) }] };
+        }
+      }
 
       case "create_mr_discussion_with_position": {
         const payload = {

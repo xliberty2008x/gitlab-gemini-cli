@@ -45,15 +45,19 @@
 
 ## Prompt-in-CI Strategy
 - The CI job embeds the full review prompt (adapted from GitHub example) and passes MR context and JSON MR_CONTEXT.
-- Behavior: post exactly one new MR comment per run; prefer an anchored discussion via `create_mr_discussion_with_position`, fallback to a top-level note.
+- Behavior: post exactly one new MR review per run; prefer anchored discussions via `create_anchored_discussion_auto` (server picks a valid position), then a single top-level summary note. Fallback to a single top-level note when anchoring fails.
 - Strict param sourcing: tools must use MR_CONTEXT fields exactly; no guessing.
- - Concurrency: job uses `resource_group: gemini-review-$CI_MERGE_REQUEST_IID` to avoid overlapping runs.
+- Concurrency: job uses `resource_group: gemini-review-$CI_MERGE_REQUEST_IID` to avoid overlapping runs.
 
 ## Prompt & Variables
 - Prompt includes: repo path, MR URL/IID, commit SHA, source/target branches.
 - Variables passed: `CI_MERGE_REQUEST_PROJECT_URL`, `CI_PROJECT_ID`, `CI_PROJECT_PATH`, `CI_MERGE_REQUEST_IID`, `CI_COMMIT_SHA`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`.
 - JSON MR_CONTEXT embedded for robust parsing.
- - Severity levels: 🔴/🟠/🟡/🟢 included; suggestion blocks must be syntactically correct and aligned to diff lines.
+- Severity levels: 🔴/🟠/🟡/🟢 included; suggestion blocks must be syntactically correct and aligned to diff lines.
+
+## Tools
+- Write: `create_anchored_discussion_auto` (auto-anchored inline), `discussion_add_note` (summary/fallback), `discussion_list`.
+- Read: `get_merge_request`, `get_merge_request_changes`, `list_merge_request_diffs`, `get_merge_request_commits`, `get_file_contents`.
 
 ## Backlog
 - GEMINI.md as primary guardrails (deferred): centralize behavior and safety rules outside CI.

@@ -39,11 +39,15 @@
 - Runs a non‑interactive review using a prompt embedded in CI (GitHub-style):
   - Fetches MR details/commits/changes/diffs via MCP tools.
   - Posts exactly one new MR review per run:
-    - For issues (≤5): create anchored discussions via `create_mr_discussion_with_position` (use diff_refs + diffs to compute position).
+    - For issues (≤5): create anchored discussions via `create_anchored_discussion_auto` (server derives a valid position from diff_refs + diffs).
     - Then post one top-level summary note.
     - Fallback: if anchoring fails, post a single top-level note with consolidated feedback.
   - MR variables are passed in the prompt (plain text + JSON MR_CONTEXT) for robust parsing.
   - Concurrency: `resource_group` prevents overlapping runs for the same MR.
+
+Prompt Delivery (reliable)
+- CI writes the prompt to `prompt.tmpl` using a single-quoted heredoc (prevents shell interpreting code fences).
+- The job runs `envsubst < prompt.tmpl | gemini --debug --yolo` to inject MR variables safely.
 
 ## 5) Trigger & Validate
 - Open an MR (feature → `main`).
