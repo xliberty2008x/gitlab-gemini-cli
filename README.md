@@ -12,7 +12,7 @@ After installation, every Merge Request will automatically receive:
 ## Prerequisites
 
 - GitLab project with Maintainer access
-- GitLab Runner configured (Docker or Shell executor)
+- GitLab Runner with tags: `gemini-review`, `docker` (ask your sysadmin if unavailable - see [SYSADMIN.md](SYSADMIN.md))
 - Gemini API key (ask your admin or create at [Google AI Studio](https://aistudio.google.com/app/apikey))
 - GitLab Personal Access Token with `api` scope
 
@@ -59,7 +59,14 @@ cp /path/to/gitlab_gemini_cli/package.json .
 
 ### Common Steps (Both Methods)
 
-**Step 3: Get API Keys**
+**Step 3: Verify Runner Availability**
+
+Check if a runner with required tags exists:
+1. GitLab → **Settings → CI/CD → Runners**
+2. Look for a runner with tags: `gemini-review`, `docker`
+3. If missing → ask your sysadmin to set up a runner (see [SYSADMIN.md](SYSADMIN.md))
+
+**Step 4: Get API Keys**
 
 **Gemini API Key:**
 - **Option A (Recommended):** Contact your team admin for a Gemini API key
@@ -70,7 +77,7 @@ cp /path/to/gitlab_gemini_cli/package.json .
 2. Create token with **`api` scope**
 3. Copy the token (starts with `glpat-...`)
 
-**Step 4: Handle Existing Files**
+**Step 5: Handle Existing Files**
 
 **If you already have `.gitlab-ci.yml`:**
 - Merge the `gemini_cli_code_review` job manually
@@ -81,7 +88,7 @@ cp /path/to/gitlab_gemini_cli/package.json .
 npm install @modelcontextprotocol/sdk@^0.4.0 node-fetch@^2.6.11
 ```
 
-**Step 5: Configure GitLab CI/CD Variables**
+**Step 6: Configure GitLab CI/CD Variables**
 
 In GitLab: **Settings → CI/CD → Variables**
 
@@ -100,7 +107,7 @@ Add these 2 variables:
 |-----|-------|-------|
 | `GITLAB_API_URL` | `https://your-gitlab.com/api/v4` | None |
 
-**Step 6: Update API URL (Self-Hosted GitLab Only)**
+**Step 7: Update API URL (Self-Hosted GitLab Only)**
 
 If using self-hosted GitLab (not gitlab.com), edit these 2 files:
 
@@ -116,7 +123,7 @@ const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://your-gitlab.com/ap
 
 **For gitlab.com:** Use `https://gitlab.com/api/v4`
 
-**Step 7: Commit and Push**
+**Step 8: Commit and Push**
 
 ```bash
 git add .gitlab-ci.yml gitlab-mcp-server.js package.json
@@ -124,7 +131,7 @@ git commit -m "Add Gemini AI code review"
 git push origin main
 ```
 
-**Step 8: Test with a Merge Request**
+**Step 9: Test with a Merge Request**
 
 ```bash
 # Create test branch
@@ -153,7 +160,8 @@ Then:
 
 | Issue | Solution |
 |-------|----------|
-| "gemini: not found" | Verify runner has Node 20+ or uses `node:20-alpine` image |
+| Job stuck "pending" | Runner missing or no matching tags (`gemini-review`, `docker`) - ask sysadmin |
+| "gemini: not found" | Runner needs Node 20+ or `node:20-alpine` image |
 | "GEMINI_API_KEY is not set" | Check variable exists in CI/CD settings; uncheck "Protected" for testing |
 | "401 Unauthorized" | Verify `GITLAB_REVIEW_PAT` is valid and has `api` scope |
 | "403 Forbidden" | Check `GITLAB_API_URL` is correct; ensure PAT user has Developer role |
@@ -185,11 +193,14 @@ npm run mcp:serve
 
 ## For Administrators
 
-If you need to manage API keys for multiple projects with usage tracking:
-- See [GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md) for creating and managing corporate GCP API keys
+**GitLab Runner Setup:**
+- See [SYSADMIN.md](SYSADMIN.md) for setting up shared runners with Docker executor
 
-For architecture and technical details:
-- See [CLAUDE.md](CLAUDE.md) for MCP server implementation and system architecture
+**API Key Management:**
+- See [GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md) for corporate GCP API keys with usage tracking
+
+**Architecture:**
+- See [CLAUDE.md](CLAUDE.md) for MCP server implementation and technical details
 
 ---
 

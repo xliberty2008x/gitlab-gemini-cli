@@ -4,6 +4,9 @@ stages:
 gemini_cli_code_review:
   stage: review
   image: node:20-alpine
+  tags:
+    - gemini-review
+    - docker
   variables:
     GEMINI_CLI_VERSION: "0.2.2"
   resource_group: "gemini-review-$CI_MERGE_REQUEST_IID"
