@@ -5,7 +5,7 @@ const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require("@modelcontextprotocol/sdk/types.js");
 const fetch = require("node-fetch");
 
-const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://hs2git.ab-games.com/api/v4";
+const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://gitlab.example.com/api/v4";
 const GITLAB_TOKEN = process.env.GITLAB_PERSONAL_ACCESS_TOKEN;
 const GITLAB_TOKEN_HEADER = process.env.GITLAB_TOKEN_HEADER || "Authorization"; // "JOB-TOKEN", "PRIVATE-TOKEN", or "Authorization"
 

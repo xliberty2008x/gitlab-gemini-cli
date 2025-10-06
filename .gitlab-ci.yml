@@ -89,7 +89,7 @@ gemini_cli_code_review:
             "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
             "env": {
               "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
-              "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4",
+              "GITLAB_API_URL": "https://gitlab.example.com/api/v4",
               "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
             },
             "timeout": 10000,

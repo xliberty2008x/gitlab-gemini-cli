@@ -53,7 +53,7 @@ MR Created → CI Triggered → Setup Environment → Generate Settings → Run 
          "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
          "env": {
            "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
-           "GITLAB_API_URL": "https://hs2git.ab-games.com/api/v4"
+           "GITLAB_API_URL": "https://gitlab.example.com/api/v4"
          }
        }
      }
@@ -163,7 +163,7 @@ Set in **GitLab → Settings → CI/CD → Variables**:
 |----------|------|-------------|
 | `GEMINI_API_KEY` | Masked | Google AI Studio API key |
 | `GITLAB_REVIEW_PAT` | Masked | GitLab PAT with `api` scope (unprotect for testing) |
-| `GITLAB_API_URL` | Optional | Default: `https://hs2git.ab-games.com/api/v4` |
+| `GITLAB_API_URL` | Optional | Default: `https://gitlab.example.com/api/v4` |
 
 ### Runner Requirements
 
