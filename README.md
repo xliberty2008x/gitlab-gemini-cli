@@ -167,22 +167,6 @@ Then:
 | "403 Forbidden" | Check `GITLAB_API_URL` is correct; ensure PAT user has Developer role |
 | No comments | Normal if no issues found; check job logs for errors |
 
-## Local Testing (MCP Server)
-
-Test the GitLab MCP server locally (not CI - for development only):
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env and add your GitLab PAT and API URL
-# Then run the server
-npm install
-npm run mcp:serve
-```
-
-This tests the MCP server connection to GitLab API. CI testing happens automatically on MRs.
-
 ## Repository Files
 
 | File | Required | Purpose |
@@ -190,8 +174,7 @@ This tests the MCP server connection to GitLab API. CI testing happens automatic
 | `.gitlab-ci.yml` | ✅ | CI job definition and review prompt |
 | `gitlab-mcp-server.js` | ✅ | MCP server with GitLab API tools |
 | `package.json` | ✅ | Node.js dependencies |
-| `README.md` | 📄 | This installation guide |
-| `.env.example` | 📄 | Environment variables template for local testing |
+| `README.md` | 📄 | Installation guide |
 
 ## For Administrators
 
