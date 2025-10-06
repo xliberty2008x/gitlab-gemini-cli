@@ -13,7 +13,7 @@ After installation, every Merge Request will automatically receive:
 
 - GitLab project with Maintainer access
 - GitLab Runner configured (Docker or Shell executor)
-- Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Gemini API key (ask your admin or create at [Google AI Studio](https://aistudio.google.com/app/apikey))
 - GitLab Personal Access Token with `api` scope
 
 ## Installation
@@ -43,7 +43,7 @@ cp /path/to/extracted/package.json .
 **Step 1: Clone or Download**
 ```bash
 # Clone this repository
-git clone https://github.com/your-org/gitlab_gemini_cli.git
+git clone https://gitlab.com/your-org/gitlab_gemini_cli.git
 cd gitlab_gemini_cli
 ```
 
@@ -62,16 +62,13 @@ cp /path/to/gitlab_gemini_cli/package.json .
 **Step 3: Get API Keys**
 
 **Gemini API Key:**
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Click **"Create API Key"**
-3. Copy the key (starts with `AIza...`)
+- **Option A (Recommended):** Contact your team admin for a Gemini API key
+- **Option B:** Create your own at [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 **GitLab Personal Access Token:**
 1. GitLab → **Settings → Access Tokens**
 2. Create token with **`api` scope**
 3. Copy the token (starts with `glpat-...`)
-
-> **For corporate GCP accounts:** See [GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md) for creating managed API keys with usage tracking.
 
 **Step 4: Handle Existing Files**
 
@@ -185,15 +182,15 @@ npm run mcp:serve
 | `package.json` | ✅ | Node.js dependencies |
 | `README.md` | 📄 | This installation guide |
 | `.env.example` | 📄 | Environment variables template for local testing |
-| `GCP_API_KEY_MANAGEMENT.md` | 📄 | Corporate GCP API key setup guide |
-| `CLAUDE.md` | 📄 | Architecture and technical documentation |
 
-## Additional Documentation
+## For Administrators
 
-- **[GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md)** - Guide for managing API keys in corporate GCP accounts with project-specific tracking
-- **[CLAUDE.md](CLAUDE.md)** - Detailed architecture, MCP server implementation, and technical deep dive
+If you need to manage API keys for multiple projects with usage tracking:
+- See [GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md) for creating and managing corporate GCP API keys
+
+For architecture and technical details:
+- See [CLAUDE.md](CLAUDE.md) for MCP server implementation and system architecture
 
 ---
 
 **Setup Time:** 15-30 minutes
-**You're done!** Every MR will now get AI code review automatically.
