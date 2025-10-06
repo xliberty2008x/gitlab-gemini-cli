@@ -5,8 +5,9 @@ const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require("@modelcontextprotocol/sdk/types.js");
 const fetch = require("node-fetch");
 
-const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://gitlab.com/api/v4";
+const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://hs2git.ab-games.com/api/v4";
 const GITLAB_TOKEN = process.env.GITLAB_PERSONAL_ACCESS_TOKEN;
+const GITLAB_TOKEN_HEADER = process.env.GITLAB_TOKEN_HEADER || "Authorization"; // "JOB-TOKEN", "PRIVATE-TOKEN", or "Authorization"
 
 if (!GITLAB_TOKEN) {
   console.error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is required");
@@ -28,9 +29,14 @@ const server = new Server(
 // Helper function to make GitLab API calls
 async function gitlabApi(endpoint, options = {}) {
   const url = `${GITLAB_API_URL}${endpoint}`;
+  const authHeaders = (() => {
+    if (GITLAB_TOKEN_HEADER === "JOB-TOKEN") return { "JOB-TOKEN": GITLAB_TOKEN };
+    if (GITLAB_TOKEN_HEADER === "PRIVATE-TOKEN") return { "PRIVATE-TOKEN": GITLAB_TOKEN };
+    return { "Authorization": `Bearer ${GITLAB_TOKEN}` };
+  })();
   const response = await fetch(url, {
     headers: {
-      "Authorization": `Bearer ${GITLAB_TOKEN}`,
+      ...authHeaders,
       "Content-Type": "application/json",
       ...options.headers,
     },
@@ -254,6 +260,111 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["project_id", "ref"],
         },
       },
+      {
+        name: "discussion_add_note",
+        description: "Add a note/comment to a merge request discussion",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "The content of the note/comment" },
+            discussion_id: { type: "string", description: "Discussion ID (optional, for replying to existing discussion)" }
+          },
+          required: ["project_id", "merge_request_iid", "body"],
+        },
+      },
+      {
+        name: "update_note",
+        description: "Update an existing merge request note by ID",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            note_id: { type: "string", description: "Note ID to update" },
+            body: { type: "string", description: "New content for the note" },
+          },
+          required: ["project_id", "merge_request_iid", "note_id", "body"],
+        },
+      },
+      {
+        name: "discussion_list",
+        description: "List all discussions/comments in a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
+      {
+        name: "get_merge_request_participants",
+        description: "Get participants (users involved) in a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
+      {
+        name: "list_merge_request_diffs",
+        description: "List detailed diffs for a merge request",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+          },
+          required: ["project_id", "merge_request_iid"],
+        },
+      },
+      {
+        name: "create_anchored_discussion_auto",
+        description: "Create a new MR discussion anchored to the first added line in the latest diffs. Falls back to top-level note on failure.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "Discussion body text" }
+          },
+          required: ["project_id", "merge_request_iid", "body"],
+        },
+      },
+      {
+        name: "create_mr_discussion_with_position",
+        description: "Create a new MR discussion anchored to a specific diff position",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string", description: "Project ID or URL-encoded path" },
+            merge_request_iid: { type: "string", description: "Merge request IID" },
+            body: { type: "string", description: "Discussion body text" },
+            position: {
+              type: "object",
+              description: "GitLab diff position object",
+              properties: {
+                position_type: { type: "string", enum: ["text", "image"], description: "Position type" },
+                base_sha: { type: "string" },
+                start_sha: { type: "string" },
+                head_sha: { type: "string" },
+                new_path: { type: "string" },
+                old_path: { type: "string" },
+                new_line: { type: "number" },
+                old_line: { type: "number" }
+              },
+              required: ["position_type", "base_sha", "start_sha", "head_sha"],
+            }
+          },
+          required: ["project_id", "merge_request_iid", "body", "position"],
+        },
+      },
     ],
   };
 });
@@ -287,22 +398,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const issue = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/issues/${args.issue_iid}`);
         return { content: [{ type: "text", text: JSON.stringify(issue, null, 2) }] };
 
-      case "get_file_contents":
-        const file = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${args.ref || 'main'}`);
+      case "get_file_contents": {
+        let ref = args.ref;
+        if (!ref) {
+          try {
+            const project = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}`);
+            ref = project.default_branch || 'main';
+          } catch (error) {
+            ref = 'main';
+          }
+        }
+        const file = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${ref}`);
         const content = Buffer.from(file.content, 'base64').toString('utf8');
         return { content: [{ type: "text", text: content }] };
+      }
 
-      case "create_or_update_file":
+      case "create_or_update_file": {
+        let method = "POST";
+        try {
+          await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}?ref=${args.branch}`);
+          method = "PUT";
+        } catch (error) {
+          // If GET fails, assume file doesn't exist and create via POST
+        }
         const fileData = {
           branch: args.branch,
           commit_message: args.commit_message,
           content: args.content,
         };
         const result = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/repository/files/${encodeURIComponent(args.file_path)}`, {
-          method: "POST",
+          method,
           body: JSON.stringify(fileData),
         });
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
 
       case "create_merge_request":
         const mrData = {
@@ -338,19 +467,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const pipelines = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/pipelines?${pipelineParams}`);
         return { content: [{ type: "text", text: JSON.stringify(pipelines, null, 2) }] };
 
-      case "get_job_log":
+      case "get_job_log": {
         // Job logs return plain text, not JSON
         const logUrl = `${GITLAB_API_URL}/projects/${encodeURIComponent(args.project_id)}/jobs/${args.job_id}/trace`;
-        const logResponse = await fetch(logUrl, {
-          headers: {
-            "Authorization": `Bearer ${GITLAB_TOKEN}`,
-          },
-        });
+        const authHeaders = (() => {
+          if (GITLAB_TOKEN_HEADER === "JOB-TOKEN") return { "JOB-TOKEN": GITLAB_TOKEN };
+          if (GITLAB_TOKEN_HEADER === "PRIVATE-TOKEN") return { "PRIVATE-TOKEN": GITLAB_TOKEN };
+          return { "Authorization": `Bearer ${GITLAB_TOKEN}` };
+        })();
+        const logResponse = await fetch(logUrl, { headers: { ...authHeaders } });
         if (!logResponse.ok) {
           throw new Error(`GitLab API error: ${logResponse.status} ${logResponse.statusText}`);
         }
         const logText = await logResponse.text();
         return { content: [{ type: "text", text: logText }] };
+      }
 
       case "retry_pipeline":
         const retryResult = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/pipelines/${args.pipeline_id}/retry`, {
@@ -374,6 +505,139 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           body: JSON.stringify(triggerData),
         });
         return { content: [{ type: "text", text: JSON.stringify(triggerResult, null, 2) }] };
+
+      // NEW: Discussion/Comment tools handlers
+      case "discussion_add_note":
+        let noteEndpoint;
+        let noteData;
+        
+        if (args.discussion_id) {
+          // Reply to existing discussion
+          noteEndpoint = `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions/${args.discussion_id}/notes`;
+          noteData = { body: args.body };
+        } else {
+          // Create new discussion/comment
+          noteEndpoint = `/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes`;
+          noteData = { body: args.body };
+        }
+        
+        const noteResult = await gitlabApi(noteEndpoint, {
+          method: "POST",
+          body: JSON.stringify(noteData),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(noteResult, null, 2) }] };
+
+      case "discussion_list":
+        const discussions = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`);
+        return { content: [{ type: "text", text: JSON.stringify(discussions, null, 2) }] };
+
+      case "update_note":
+        const updated = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes/${args.note_id}`, {
+          method: "PUT",
+          body: JSON.stringify({ body: args.body }),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(updated, null, 2) }] };
+
+      case "get_merge_request_participants":
+        const participants = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/participants`);
+        return { content: [{ type: "text", text: JSON.stringify(participants, null, 2) }] };
+
+      case "list_merge_request_diffs":
+        const diffs = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/diffs`);
+        return { content: [{ type: "text", text: JSON.stringify(diffs, null, 2) }] };
+
+      case "create_anchored_discussion_auto": {
+        // Helper to parse unified diffs and find the first added new_line
+        function findFirstAddedLine(diffText) {
+          if (!diffText) return null;
+          const lines = diffText.split(/\r?\n/);
+          let currentNew = null;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.startsWith('@@')) {
+              // Example: @@ -a,b +c,d @@ or @@ -a +c @@
+              const m = /@@\s-\d+(?:,\d+)?\s\+(\d+)(?:,\d+)?\s@@/.exec(line);
+              if (m) currentNew = parseInt(m[1], 10) - 1; // will increment on context/+ lines
+              continue;
+            }
+            if (currentNew === null) continue;
+            if (line.startsWith('--- ') || line.startsWith('+++ ')) continue; // headers
+            if (line.startsWith('+')) {
+              currentNew += 1;
+              // Skip file header lines like +++ which we filtered; return the first added code line
+              return currentNew;
+            } else if (line.startsWith(' ')) {
+              currentNew += 1; // context advances new line count
+            } else if (line.startsWith('-')) {
+              // removed line: advances old only, not new
+            } else {
+              // unknown; ignore
+            }
+          }
+          return null;
+        }
+
+        try {
+          // Fetch MR for diff_refs
+          const mr = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}`);
+          const refs = mr && mr.diff_refs ? mr.diff_refs : null;
+          if (!refs || !refs.base_sha || !refs.start_sha || !refs.head_sha) {
+            throw new Error('Missing diff_refs for MR; cannot anchor');
+          }
+
+          // Fetch changes to get per-file unified diffs
+          const changesResp = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/changes`);
+          const changes = (changesResp && changesResp.changes) || [];
+          let position = null;
+          for (const ch of changes) {
+            const diffText = ch.diff || ch.patch || '';
+            const newLine = findFirstAddedLine(diffText);
+            const newPath = ch.new_path || ch.newFile || ch.new_path; // prefer new_path
+            if (newLine && newPath) {
+              position = {
+                position_type: 'text',
+                base_sha: refs.base_sha,
+                start_sha: refs.start_sha,
+                head_sha: refs.head_sha,
+                new_path: newPath,
+                new_line: newLine,
+              };
+              break;
+            }
+          }
+
+          if (!position) {
+            throw new Error('Could not determine a valid added line to anchor');
+          }
+
+          const payload = { body: args.body, position };
+          const created = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          return { content: [{ type: 'text', text: JSON.stringify(created, null, 2) }] };
+        } catch (e) {
+          // Fallback to top-level note
+          const noteBody = `${args.body}\n\n_(Auto-anchoring unavailable: ${e.message})_`;
+          const note = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/notes`, {
+            method: 'POST',
+            body: JSON.stringify({ body: noteBody }),
+          });
+          return { content: [{ type: 'text', text: JSON.stringify(note, null, 2) }] };
+        }
+      }
+
+      case "create_mr_discussion_with_position": {
+        const payload = {
+          body: args.body,
+          position: args.position,
+        };
+        const created = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(created, null, 2) }] };
+      }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
