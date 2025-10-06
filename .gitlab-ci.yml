@@ -7,8 +7,6 @@ gemini_cli_code_review:
   tags:
     - gemini-review
     - docker
-  variables:
-    GEMINI_CLI_VERSION: "0.2.2"
   resource_group: "gemini-review-$CI_MERGE_REQUEST_IID"
   before_script:
     - set -euo pipefail
@@ -26,8 +24,8 @@ gemini_cli_code_review:
           fi
         fi
         npm --version || true
-        echo "Installing pinned Gemini CLI ${GEMINI_CLI_VERSION}…"
-        npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
+        echo "Installing latest Gemini CLI…"
+        npm install -g @google/gemini-cli@latest
         gemini --version || true
         # Ensure envsubst is available for prompt templating
         if ! command -v envsubst >/dev/null 2>&1; then
@@ -49,8 +47,8 @@ gemini_cli_code_review:
         elif command -v apt-get >/dev/null 2>&1; then
           apt-get update && apt-get install -y ca-certificates curl bash && rm -rf /var/lib/apt/lists/*
         fi
-        echo "Installing pinned Gemini CLI ${GEMINI_CLI_VERSION}…"
-        npm install -g @google/gemini-cli@"${GEMINI_CLI_VERSION}"
+        echo "Installing latest Gemini CLI…"
+        npm install -g @google/gemini-cli@latest
         gemini --version || true
         npm install --omit=dev
         npm ls @modelcontextprotocol/sdk || true
