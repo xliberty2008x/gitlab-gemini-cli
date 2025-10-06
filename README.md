@@ -43,8 +43,8 @@ cp /path/to/extracted/package.json .
 **Step 1: Clone or Download**
 ```bash
 # Clone this repository
-git clone https://gitlab.com/your-org/gitlab_gemini_cli.git
-cd gitlab_gemini_cli
+git clone https://github.com/xliberty2008x/gitlab-gemini-cli.git
+cd gitlab-gemini-cli
 ```
 
 **Step 2: Copy Files to Your Project**
@@ -167,19 +167,21 @@ Then:
 | "403 Forbidden" | Check `GITLAB_API_URL` is correct; ensure PAT user has Developer role |
 | No comments | Normal if no issues found; check job logs for errors |
 
-## Local Testing
+## Local Testing (MCP Server)
 
-Test the MCP server locally before deploying:
+Test the GitLab MCP server locally (not CI - for development only):
 
 ```bash
 # Copy environment template
 cp .env.example .env
 
-# Edit .env and add your GitLab PAT
+# Edit .env and add your GitLab PAT and API URL
 # Then run the server
 npm install
 npm run mcp:serve
 ```
+
+This tests the MCP server connection to GitLab API. CI testing happens automatically on MRs.
 
 ## Repository Files
 
