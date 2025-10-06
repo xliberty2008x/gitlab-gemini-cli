@@ -9,75 +9,27 @@ gemini_cli_code_review:
     - docker
   resource_group: "gemini-review-$CI_MERGE_REQUEST_IID"
   before_script:
-    - set -euo pipefail
-    - echo "Detecting runner OS…"
-    - OS=$(uname -s); echo "OS=${OS}"
-    - |
-      if [ "${OS}" = "Darwin" ]; then
-        echo "Shell runner on macOS detected. Ensuring prerequisites via Homebrew…"
-        if ! command -v node >/dev/null 2>&1; then
-          if command -v brew >/dev/null 2>&1; then
-            brew install node@20 || brew install node || true
-          else
-            echo "Node.js not found. Please install Node 20+ on the runner host." >&2
-            exit 1
-          fi
-        fi
-        npm --version || true
-        echo "Installing latest Gemini CLI…"
-        npm install -g @google/gemini-cli@latest
-        gemini --version || true
-        # Ensure envsubst is available for prompt templating
-        if ! command -v envsubst >/dev/null 2>&1; then
-          if command -v brew >/dev/null 2>&1; then
-            brew install gettext || true
-            export PATH="$(brew --prefix)/opt/gettext/bin:$PATH"
-          else
-            echo "envsubst not found and Homebrew is unavailable. Install gettext on the host or provide envsubst." >&2
-            exit 1
-          fi
-        fi
-        envsubst --version || true
-        npm install --omit=dev
-        npm ls @modelcontextprotocol/sdk || true
-      else
-        echo "Linux or containerized runner detected. Installing system deps…"
-        if command -v apk >/dev/null 2>&1; then
-          apk add --no-cache bash ca-certificates curl
-        elif command -v apt-get >/dev/null 2>&1; then
-          apt-get update && apt-get install -y ca-certificates curl bash && rm -rf /var/lib/apt/lists/*
-        fi
-        echo "Installing latest Gemini CLI…"
-        npm install -g @google/gemini-cli@latest
-        gemini --version || true
-        npm install --omit=dev
-        npm ls @modelcontextprotocol/sdk || true
-      fi
+    - apk add --no-cache bash ca-certificates curl
+    - npm install -g @google/gemini-cli@latest
+    - gemini --version
+    - npm install --omit=dev
   script:
-    - echo "Starting the Gemini CLI job..."
     - |
+      # Validate required variables
       if [ -z "${GEMINI_API_KEY:-}" ]; then
-        echo "Error: 'GEMINI_API_KEY' is not set." >&2
+        echo "Error: GEMINI_API_KEY is not set." >&2
         exit 1
       fi
       if [ -z "${GITLAB_REVIEW_PAT:-}" ]; then
-        echo "Error: 'GITLAB_REVIEW_PAT' is not set." >&2
+        echo "Error: GITLAB_REVIEW_PAT is not set." >&2
         exit 1
       fi
       if [ -z "${CI_MERGE_REQUEST_IID:-}" ]; then
-        echo "Error: This job must run on merge_request_event (no MR IID)." >&2
+        echo "Error: This job must run on merge_request_event." >&2
         exit 1
       fi
     - |
-      set -euo pipefail
-      echo "Verifying Gemini CLI availability…"
-      if ! command -v gemini >/dev/null 2>&1; then
-        echo "Gemini CLI not found in PATH. Ensure your runner image provides 'gemini'." >&2
-        exit 1
-      fi
-      gemini --version || true
-    - |
-      echo "Writing Gemini CLI settings for in-repo GitLab MCP…"
+      # Configure Gemini CLI with GitLab MCP server
       mkdir -p "$HOME/.gemini"
       cat > "$HOME/.gemini/settings.json" <<EOF
       {
@@ -109,7 +61,7 @@ gemini_cli_code_review:
       }
       EOF
     - |
-      echo "Performing Code Review with Gemini"
+      # Run Gemini code review
       cat > "${CI_PROJECT_DIR}/prompt.tmpl" <<'PROMPT'
         ## Role
 
@@ -150,9 +102,7 @@ gemini_cli_code_review:
 
         Follow detailed Review Criteria, Severity Levels, and Templates from GEMINI.md.
       PROMPT
-      echo "Preview of rendered prompt (first 3 lines):"
-      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | head -n 3 || true
-      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --debug --yolo
+      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --yolo
 
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
