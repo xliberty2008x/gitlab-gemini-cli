@@ -1,40 +1,23 @@
-# Bridgetown
-output
-.bridgetown-cache
-.bridgetown-metadata
-.bridgetown-webpack
-
-# Dependency folders
-node_modules
-bower_components
-vendor
-
-# Caches
-.sass-cache
-.npm
-.node_repl_history
-
-# Ignore bundler config.
-/.bundle
-
-# Ignore Byebug command history file.
-.byebug_history
-
-# dotenv environment variables file
+# Environment variables (never commit!)
 .env
 
-# Local Codex config and wrappers (keep local-only)
-.codex/
-bin/codex-with-mcp
-bin/gitlab-mcp
+# Dependencies
+node_modules/
 
-# Mac files
+# OS files
 .DS_Store
 
-# Yarn
-yarn-error.log
-yarn-debug.log*
-.pnp/
-.pnp.js
-# Yarn Integrity file
-.yarn-integrity
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+.cache/
