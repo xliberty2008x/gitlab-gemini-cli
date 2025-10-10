@@ -206,6 +206,44 @@ The installer automatically handles URL configuration in all files.
 
 ## 🔍 Troubleshooting
 
+### Installation Issues
+
+#### `npm ERR! 404 Not Found - gitlab-gemini-cli`
+
+The package exists but npm can't find it. This usually happens due to:
+
+**Solution 1: Clear npm cache**
+```bash
+npm cache clean --force
+npx gitlab-gemini-cli init
+```
+
+**Solution 2: Specify exact version**
+```bash
+npx gitlab-gemini-cli@1.0.0 init
+```
+
+**Solution 3: Check npm registry**
+```bash
+npm config get registry
+# Should be: https://registry.npmjs.org/
+
+# If different, reset to default:
+npm config set registry https://registry.npmjs.org/
+```
+
+**Solution 4: Wait for CDN propagation**
+- Freshly published packages may take 5-15 minutes to propagate to all npm CDN mirrors
+- Try again in a few minutes
+
+**Solution 5: Install then run**
+```bash
+npm install gitlab-gemini-cli
+npx gitlab-gemini-cli init
+```
+
+### CI/CD Issues
+
 | Issue | Solution |
 |-------|----------|
 | Job stuck "pending" | Runner missing or no matching tags - see [SYSADMIN.md](SYSADMIN.md) |
