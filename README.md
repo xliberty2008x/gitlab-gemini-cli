@@ -31,6 +31,10 @@ After installation, every Merge Request automatically receives:
 npx gitlab-gemini-cli init
 ```
 
+> **⚠️ Important:** The package name uses **hyphens** (`gitlab-gemini-cli`), not underscores!
+> ❌ Wrong: `npx gitlab_gemini_cli init`
+> ✅ Correct: `npx gitlab-gemini-cli init`
+
 That's it! The installer will:
 1. Ask for your GitLab instance type (gitlab.com or self-hosted)
 2. Optionally validate your GitLab connection
@@ -208,9 +212,15 @@ The installer automatically handles URL configuration in all files.
 
 ### Installation Issues
 
-#### `npm ERR! 404 Not Found - gitlab-gemini-cli`
+#### `npm ERR! 404 Not Found - gitlab_gemini_cli` or `gitlab-gemini-cli`
 
-The package exists but npm can't find it. This usually happens due to:
+**Most Common Cause: Wrong Package Name**
+
+The package name uses **hyphens**, not underscores:
+- ❌ Wrong: `npx gitlab_gemini_cli init`
+- ✅ Correct: `npx gitlab-gemini-cli init`
+
+If you're using the correct name and still getting 404, it's usually due to:
 
 **Solution 1: Clear npm cache**
 ```bash
