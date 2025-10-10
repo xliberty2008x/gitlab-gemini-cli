@@ -24,3 +24,8 @@ npm-debug.log*
 
 .gemini/
 gha-creds-*.json
+
+# Documentation (keep only README.md)
+CLAUDE.md
+GCP_API_KEY_MANAGEMENT.md
+SYSADMIN.md
