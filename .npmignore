@@ -1,0 +1,36 @@
+# Development files
+.env
+.env.*
+node_modules/
+*.log
+*.tgz
+
+# Git files
+.git/
+.gitignore
+.github/
+
+# Documentation (except README)
+.docs/
+SYSADMIN.md
+GCP_API_KEY_MANAGEMENT.md
+
+# Project-specific files (not needed in published package)
+.gitlab-gemini-cli.json
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

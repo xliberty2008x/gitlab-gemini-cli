@@ -1,12 +1,52 @@
 {
-  "name": "bridgetown",
+  "name": "gitlab-gemini-cli",
   "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.4.0",
-    "node-fetch": "^2.6.11"
+  "description": "Automated AI-powered code review for GitLab using Google Gemini and Model Context Protocol",
+  "main": "lib/installer.js",
+  "bin": {
+    "gitlab-gemini-cli": "./bin/cli.js"
   },
   "scripts": {
     "mcp:serve": "node gitlab-mcp-server.js"
+  },
+  "keywords": [
+    "gitlab",
+    "gemini",
+    "ai",
+    "code-review",
+    "mcp",
+    "model-context-protocol",
+    "ci",
+    "automation"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xliberty2008x/gitlab-gemini-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xliberty2008x/gitlab-gemini-cli/issues"
+  },
+  "homepage": "https://github.com/xliberty2008x/gitlab-gemini-cli#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "node-fetch": "^2.6.11",
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {},
+  "publishConfig": {
+    "access": "public"
   }
 }

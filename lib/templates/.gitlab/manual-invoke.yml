@@ -1,0 +1,90 @@
+# Manual Invoke Workflow
+# On-demand Gemini AI execution with custom prompts
+
+gemini_cli_manual_invoke:
+  stage: dispatch
+  image: node:20-alpine
+  tags:
+    - gemini-review
+    - docker
+  before_script:
+    - apk add --no-cache bash ca-certificates curl
+    - npm install -g @google/gemini-cli@latest
+    - gemini --version
+    - npm install --omit=dev
+  script:
+    - |
+      # Validate required variables
+      if [ -z "${GEMINI_API_KEY:-}" ]; then
+        echo "Error: GEMINI_API_KEY is not set." >&2
+        exit 1
+      fi
+      if [ -z "${GITLAB_REVIEW_PAT:-}" ]; then
+        echo "Error: GITLAB_REVIEW_PAT is not set." >&2
+        exit 1
+      fi
+    - |
+      # Configure Gemini CLI with GitLab MCP server
+      mkdir -p "$HOME/.gemini"
+      cat > "$HOME/.gemini/settings.json" <<EOF
+      {
+        "mcpServers": {
+          "gitlab": {
+            "command": "node",
+            "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
+            "env": {
+              "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
+              "GITLAB_API_URL": "https://gitlab.example.com/api/v4",
+              "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
+            },
+            "timeout": 10000
+          }
+        }
+      }
+      EOF
+    - |
+      # Run custom prompt or default help
+      if [ -n "${CUSTOM_PROMPT:-}" ]; then
+        echo "Running custom prompt: ${CUSTOM_PROMPT}"
+        echo "${CUSTOM_PROMPT}" | gemini --yolo
+      else
+        echo "No CUSTOM_PROMPT provided. Running default help."
+        cat > "${CI_PROJECT_DIR}/manual-help.tmpl" <<'PROMPT'
+        ## Manual Invoke Help
+
+        You are an AI assistant with access to GitLab MCP tools for project: ${CI_PROJECT_PATH}
+
+        Available tool categories:
+        - Merge Requests: get_merge_request, list_merge_requests, create_merge_request, get_merge_request_changes
+        - Issues: get_issue, list_issues, create_issue, update_issue
+        - Discussions: discussion_add_note, discussion_list, create_anchored_discussion_auto
+        - Files: get_file_contents, create_or_update_file
+        - Labels: list_project_labels, add_issue_labels
+        - Pipelines: get_pipeline_status, list_project_pipelines
+        - Jobs: get_job_log
+
+        To use this job with a custom prompt, set the CUSTOM_PROMPT CI/CD variable when triggering manually.
+
+        Example custom prompts:
+        - "List all open merge requests and summarize their status"
+        - "Find all issues labeled 'bug' and create a summary report"
+        - "Review the latest pipeline and explain any failures"
+        - "Get the contents of README.md and suggest improvements"
+
+        Project Context:
+        - Project ID: ${CI_PROJECT_ID}
+        - Project Path: ${CI_PROJECT_PATH}
+        - Default Branch: ${CI_DEFAULT_BRANCH}
+
+        Please acknowledge that you understand these tools and are ready for a custom task.
+        PROMPT
+        envsubst < "${CI_PROJECT_DIR}/manual-help.tmpl" | gemini --yolo
+      fi
+
+  rules:
+    - when: manual
+      allow_failure: true
+
+  # Allow users to set custom variables when triggering manually
+  variables:
+    CUSTOM_PROMPT: ""
