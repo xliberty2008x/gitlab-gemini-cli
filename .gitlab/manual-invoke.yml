@@ -5,8 +5,7 @@ gemini_cli_manual_invoke:
   stage: dispatch
   image: node:20-alpine
   tags:
-    - gemini-review
-    - docker
+    - ai
   before_script:
     - apk add --no-cache bash ca-certificates curl
     - npm install -g @google/gemini-cli@latest

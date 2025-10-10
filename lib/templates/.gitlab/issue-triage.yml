@@ -6,8 +6,7 @@ gemini_cli_issue_triage:
   stage: triage
   image: node:20-alpine
   tags:
-    - gemini-review
-    - docker
+    - ai
   before_script:
     - apk add --no-cache bash ca-certificates curl
     - npm install -g @google/gemini-cli@latest
@@ -91,8 +90,7 @@ gemini_cli_scheduled_triage:
   stage: triage
   image: node:20-alpine
   tags:
-    - gemini-review
-    - docker
+    - ai
   before_script:
     - apk add --no-cache bash ca-certificates curl
     - npm install -g @google/gemini-cli@latest
