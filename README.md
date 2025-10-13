@@ -17,7 +17,7 @@ After installation, every Merge Request automatically receives:
 ## 📋 Prerequisites
 
 - GitLab project with Maintainer access (gitlab.com or self-hosted)
-- GitLab Runner with tags: `gemini-review`, `docker` (see [SYSADMIN.md](SYSADMIN.md))
+- GitLab Runner with tag: `ai`
 - Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
 - GitLab Personal Access Token with `api` scope
 - Node.js 16+ installed locally
@@ -208,18 +208,13 @@ The installer automatically handles URL configuration in all files.
 
 | Issue | Solution |
 |-------|----------|
-| Job stuck "pending" | Runner missing or no matching tags - see [SYSADMIN.md](SYSADMIN.md) |
+| Job stuck "pending" | Runner missing or no `ai` tag configured |
 | "gemini: not found" | Runner needs Node 20+ or `node:20-alpine` image |
 | "GEMINI_API_KEY is not set" | Check variable exists; uncheck "Protected" for testing |
 | "401 Unauthorized" | Verify `GITLAB_REVIEW_PAT` is valid with `api` scope |
 | "403 Forbidden" | Check GitLab URL; ensure PAT user has Developer role |
 | No comments posted | Normal if no issues found; check job logs |
 
-## 📖 Documentation
-
-- **[SYSADMIN.md](SYSADMIN.md)** - GitLab Runner setup for administrators
-- **[GCP_API_KEY_MANAGEMENT.md](GCP_API_KEY_MANAGEMENT.md)** - Enterprise API key management
-- **[CLAUDE.md](CLAUDE.md)** - Technical architecture and MCP server details
 
 ## 🛠️ Development
 
