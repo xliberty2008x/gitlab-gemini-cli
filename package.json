@@ -1,6 +1,6 @@
 {
   "name": "gitlab-gemini-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Automated AI-powered code review for GitLab using Google Gemini and Model Context Protocol",
   "main": "lib/installer.js",
   "bin": {
