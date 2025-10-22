@@ -53,21 +53,21 @@ gemini_cli_manual_invoke:
 
         You are an AI assistant with access to GitLab MCP tools for project: ${CI_PROJECT_PATH}
 
-        Available tool categories:
-        - Merge Requests: get_merge_request, list_merge_requests, create_merge_request, get_merge_request_changes
-        - Issues: get_issue, list_issues, create_issue, update_issue
-        - Discussions: discussion_add_note, discussion_list, create_anchored_discussion_auto
+        Available MCP tool categories:
+        - Merge Requests: get_merge_request, list_merge_requests, get_merge_request_changes, get_merge_request_commits, list_merge_request_diffs, get_merge_request_participants
+        - Discussions: discussion_add_note, discussion_list, create_anchored_discussion_auto, create_mr_discussion_with_position, update_note
         - Files: get_file_contents, create_or_update_file
-        - Labels: list_project_labels, add_issue_labels
-        - Pipelines: get_pipeline_status, list_project_pipelines
-        - Jobs: get_job_log
+        - Pipelines: get_pipeline, list_pipelines, get_pipeline_jobs, get_merge_request_pipelines, retry_pipeline, cancel_pipeline, trigger_pipeline, get_job_log
+        - Issues: get_issue
 
         To use this job with a custom prompt, set the CUSTOM_PROMPT CI/CD variable when triggering manually.
 
+        When you are asked to review a merge request, begin by loading the `.skils/gitlab-mr-reviewer/SKILL.md` file via `get_file_contents`, confirm its version, and follow its directives exactly. That skill is authoritative for CI reviews.
+
         Example custom prompts:
         - "List all open merge requests and summarize their status"
-        - "Find all issues labeled 'bug' and create a summary report"
-        - "Review the latest pipeline and explain any failures"
+        - "Audit the latest pipeline failure and explain the root cause"
+        - "Load the MR reviewer skill and perform a spot-check on MR !${CI_MERGE_REQUEST_IID:-N/A}"
         - "Get the contents of README.md and suggest improvements"
 
         Project Context:

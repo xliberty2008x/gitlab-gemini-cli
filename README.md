@@ -92,6 +92,10 @@ include:
 - **`issue-triage.yml`** - AI-powered issue labeling (webhook/scheduled)
 - **`manual-invoke.yml`** - On-demand AI tasks (manual trigger)
 
+### `.skils/` Directory (Reviewer Skill)
+- **`gitlab-mr-reviewer/SKILL.md`** - Canonical rulebook Gemini loads before reviewing
+- **`gitlab-mr-reviewer/references/`** - Unity performance, Addressables, and Zenject reference notes cited in reviews
+
 ### `gitlab-mcp-server.js` (MCP Server)
 Node.js server that exposes 20+ GitLab API operations as standardized MCP tools for AI agents.
 
@@ -103,6 +107,7 @@ Every merge request gets reviewed automatically:
 - Up to 5 inline issues + 1 summary note
 - Smart line anchoring with fallback
 - Respects `.gitignore` patterns
+- Loads the `gitlab-mr-reviewer` skill package to enforce GitLab + Unity review rules
 
 ### 🏷️ Issue Triage
 Automated issue labeling (requires webhook setup):
@@ -172,6 +177,7 @@ Your CI jobs will continue to work because they install the Gemini CLI directly 
 - ✅ `.gitlab-ci.yml` - CI/CD router configuration
 - ✅ `.gitlab/` - Modular workflow files (review, triage, manual)
 - ✅ `gitlab-mcp-server.js` - MCP server for GitLab API
+- ✅ `.skils/gitlab-mr-reviewer/` - Skill bundle loaded by Gemini before every MR review
 - ✅ `.gitlab-gemini-cli.json` - Version tracking config
 - ✅ `package.json` dependencies: `@modelcontextprotocol/sdk`, `node-fetch`
 
