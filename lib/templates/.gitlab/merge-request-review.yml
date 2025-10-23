@@ -83,7 +83,7 @@ gemini_cli_code_review:
         - Source Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
 
       PROMPT
-      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --yolo
+      envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --debug --yolo
 
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
