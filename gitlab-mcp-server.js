@@ -50,6 +50,98 @@ async function gitlabApi(endpoint, options = {}) {
   return response.json();
 }
 
+// Logging helpers
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const resolvedLogLevelName =
+  (process.env.GITLAB_MCP_LOG_LEVEL ||
+    process.env.GITLAB_MCP_LOG ||
+    process.env.MCP_LOG_LEVEL ||
+    "info").toLowerCase();
+const CURRENT_LOG_LEVEL =
+  LOG_LEVELS[resolvedLogLevelName] !== undefined
+    ? LOG_LEVELS[resolvedLogLevelName]
+    : LOG_LEVELS.info;
+
+function log(level, message, details) {
+  const target = LOG_LEVELS[level];
+  if (target === undefined || target > CURRENT_LOG_LEVEL) {
+    return;
+  }
+  if (details !== undefined) {
+    console.error(`[MCP:${level.toUpperCase()}] ${message}`, details);
+  } else {
+    console.error(`[MCP:${level.toUpperCase()}] ${message}`);
+  }
+}
+
+function redactValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") {
+    return `[redacted ${value.length} chars]`;
+  }
+  if (Array.isArray(value)) {
+    return `[redacted array(${value.length})]`;
+  }
+  if (typeof value === "object") {
+    return "[redacted object]";
+  }
+  return "[redacted]";
+}
+
+function sanitizeArgs(name, args = {}) {
+  if (!args || typeof args !== "object") {
+    return args;
+  }
+  const sensitiveKeys = new Set(["content", "body", "description", "token"]);
+  const sanitized = {};
+  for (const [key, value] of Object.entries(args)) {
+    sanitized[key] = sensitiveKeys.has(key) ? redactValue(value) : value;
+  }
+  return sanitized;
+}
+
+function summarizeContent(content) {
+  if (!Array.isArray(content)) {
+    return content;
+  }
+  return content.map((item, index) => {
+    if (!item || typeof item !== "object") {
+      return { index, type: typeof item };
+    }
+    const summary = { index, type: item.type };
+    if (typeof item.text === "string") {
+      summary.length = item.text.length;
+      summary.preview = item.text.slice(0, 120);
+    }
+    return summary;
+  });
+}
+
+function summarizeResult(result) {
+  if (!result || typeof result !== "object") {
+    return { result };
+  }
+  const summary = {
+    isError: Boolean(result.isError),
+  };
+  if ("content" in result) {
+    summary.content = summarizeContent(result.content);
+  }
+  return summary;
+}
+
+function logToolRequest(name, args) {
+  log("info", `Tool call requested: ${name}`, { args: sanitizeArgs(name, args) });
+}
+
+function logToolResponse(name, result) {
+  log("info", `Tool call completed: ${name}`, summarizeResult(result));
+}
+
+function logToolError(name, error) {
+  log("error", `Tool call failed: ${name}`, { message: error.message });
+}
+
 // List all available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
@@ -426,11 +518,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
+async function executeTool(name, args) {
+  switch (name) {
       case "get_merge_request":
         const mr = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}`);
         return { content: [{ type: "text", text: JSON.stringify(mr, null, 2) }] };
@@ -743,11 +832,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
+}
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  logToolRequest(name, args);
+
+  try {
+    const result = await executeTool(name, args);
+    logToolResponse(name, result);
+    return result;
   } catch (error) {
-    return { 
-      content: [{ 
-        type: "text", 
-        text: `Error: ${error.message}` 
+    logToolError(name, error);
+    return {
+      content: [{
+        type: "text",
+        text: `Error: ${error.message}`
       }],
       isError: true,
     };

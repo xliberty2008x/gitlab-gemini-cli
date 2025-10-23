@@ -123,6 +123,9 @@ Run custom AI tasks on-demand:
 - Full access to GitLab MCP tools
 - Examples: summarize MRs, audit security, analyze trends
 
+### 📝 Observability
+- Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Sensitive fields such as file contents and note bodies are automatically redacted.
+
 ## 🔧 CLI Commands
 
 ### `init`
