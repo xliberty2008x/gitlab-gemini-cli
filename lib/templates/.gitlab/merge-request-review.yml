@@ -74,6 +74,14 @@ gemini_cli_code_review:
         - Respect the five-comment budget and severity rules defined in the skill.
         - Finish by posting the required summary note via `discussion_add_note`, reporting any tool failures or blockers encountered.
 
+        ## GitLab Context
+
+        - Project Path: ${CI_PROJECT_PATH}
+        - Project ID: ${CI_PROJECT_ID}
+        - Merge Request IID: ${CI_MERGE_REQUEST_IID}
+        - Target Branch: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
+        - Source Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+
       PROMPT
       envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --yolo
 
