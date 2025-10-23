@@ -124,7 +124,7 @@ Run custom AI tasks on-demand:
 - Examples: summarize MRs, audit security, analyze trends
 
 ### 📝 Observability
-- Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Sensitive fields such as file contents and note bodies are automatically redacted.
+- Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Default is `debug`, and sensitive fields such as file contents and note bodies are automatically redacted.
 
 ## 🔧 CLI Commands
 
