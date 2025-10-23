@@ -38,6 +38,11 @@ gemini_cli_issue_triage:
               "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
             },
             "timeout": 10000,
+            "telemetry": {
+              "enabled": true,
+              "logPrompts": true,
+              "outfile": "${CI_PROJECT_DIR}/gemini-telemetry.log"
+            },
             "includeTools": [
               "get_issue",
               "list_project_labels",
@@ -75,7 +80,12 @@ gemini_cli_issue_triage:
         Project ID: ${CI_PROJECT_ID}
         Issue IID: ${CI_ISSUE_IID:-1}
       PROMPT
-      envsubst < "${CI_PROJECT_DIR}/triage-prompt.tmpl" | gemini --yolo
+      export DEBUG=1 DEBUG_MODE=1 LOG_LEVEL=debug
+      envsubst < "${CI_PROJECT_DIR}/triage-prompt.tmpl" | gemini --debug --yolo
+      if [ -f "${CI_PROJECT_DIR}/gemini-telemetry.log" ]; then
+        echo "--- Gemini Telemetry Log ---"
+        cat "${CI_PROJECT_DIR}/gemini-telemetry.log"
+      fi
 
   rules:
     # Note: GitLab doesn't have native issue event triggers in CI
@@ -122,6 +132,11 @@ gemini_cli_scheduled_triage:
               "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
             },
             "timeout": 10000,
+            "telemetry": {
+              "enabled": true,
+              "logPrompts": true,
+              "outfile": "${CI_PROJECT_DIR}/gemini-telemetry.log"
+            },
             "includeTools": [
               "list_issues",
               "get_issue",
@@ -164,7 +179,12 @@ gemini_cli_scheduled_triage:
 
         Project ID: ${CI_PROJECT_ID}
       PROMPT
-      envsubst < "${CI_PROJECT_DIR}/batch-triage-prompt.tmpl" | gemini --yolo
+      export DEBUG=1 DEBUG_MODE=1 LOG_LEVEL=debug
+      envsubst < "${CI_PROJECT_DIR}/batch-triage-prompt.tmpl" | gemini --debug --yolo
+      if [ -f "${CI_PROJECT_DIR}/gemini-telemetry.log" ]; then
+        echo "--- Gemini Telemetry Log ---"
+        cat "${CI_PROJECT_DIR}/gemini-telemetry.log"
+      fi
 
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
