@@ -65,6 +65,7 @@ gemini_cli_code_review:
       EOF
     - |
       # Run Gemini code review
+      rm -f "${CI_PROJECT_DIR}/gemini-telemetry.log"
       cat > "${CI_PROJECT_DIR}/prompt.tmpl" <<'PROMPT'
         ## Skill Bootstrapping
 

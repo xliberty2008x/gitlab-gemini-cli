@@ -125,7 +125,7 @@ Run custom AI tasks on-demand:
 
 ### 📝 Observability
 - Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Default is `debug`, and sensitive fields such as file contents and note bodies are automatically redacted.
-- Gemini CLI runs with `--debug` and `DEBUG` env vars; telemetry is written to `gemini-telemetry.log` which is printed at the end of each job.
+- Gemini CLI runs with `--debug` and `DEBUG` env vars; telemetry is written to `gemini-telemetry.log` which is printed at the end of each job. The log is cleared before each run to avoid repeat entries.
 - Gemini CLI runs with `--debug` and telemetry logging enabled (see pipelines for `gemini-telemetry.log` output).
 
 ## 🔧 CLI Commands

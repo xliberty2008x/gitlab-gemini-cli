@@ -12,6 +12,7 @@ gemini_cli_manual_invoke:
     - gemini --version
     - npm install --omit=dev
   script:
+    - rm -f "${CI_PROJECT_DIR}/gemini-telemetry.log"
     - |
       # Validate required variables
       if [ -z "${GEMINI_API_KEY:-}" ]; then
