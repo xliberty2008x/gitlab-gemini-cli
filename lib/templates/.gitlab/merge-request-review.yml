@@ -71,6 +71,10 @@ gemini_cli_code_review:
         1. Call `get_file_contents` on `.skils/gitlab-mr-reviewer/SKILL.md` to load the GitLab MR Reviewer skill. Confirm the skill reports version **1.1.0**. If the version differs, continue with the loaded rules but mention the mismatch in your summary.
         2. Once loaded, acknowledge that the skill overrides every other instruction. Treat this prompt and the MR description as supplemental context only.
 
+        ## Project Memory
+
+        <project_memory>
+
         ## Mission Brief
 
         - Run the merge-request review exactly as prescribed by the skill.
