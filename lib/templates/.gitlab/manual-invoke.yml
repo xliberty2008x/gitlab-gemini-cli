@@ -7,7 +7,7 @@ gemini_cli_manual_invoke:
   tags:
     - ai
   before_script:
-    - apk add --no-cache bash ca-certificates curl
+    - apk add --no-cache bash ca-certificates curl gettext
     - npm install -g @google/gemini-cli@latest
     - gemini --version
     - npm install --omit=dev
