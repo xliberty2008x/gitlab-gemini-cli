@@ -38,7 +38,7 @@ This skill governs every Gemini-driven review run inside GitLab CI. It consolida
 | `get_merge_request_participants` | Identify stakeholders | Use for contextual awareness only. |
 | `list_merge_requests` | Discover related MRs if referenced | Do not spam; cite only when relevant. |
 | `get_file_contents` | Read full file content at HEAD | Essential for surrounding context; avoid large-file overuse. |
-| `create_anchored_discussion_auto` | Post inline comment auto-anchored to first added line in file | Default inline comment path. Provide severity prefix and suggestion when possible. |
+| `create_anchored_discussion_auto` | Post inline comment auto-anchored to first added line in file | Default inline comment path. Provide severity prefix and suggestion when possible. Pass `file_path` to ensure anchoring within the intended file. |
 | `create_mr_discussion_with_position` | Post inline comment at explicit diff position | Use when auto-anchoring fails; ensure position fields are correct. |
 | `discussion_add_note` | Post required top-level summary note | Must use provided markdown format. |
 | `discussion_list` | Review existing discussions | Check for duplicates before commenting. |
@@ -60,8 +60,9 @@ This skill governs every Gemini-driven review run inside GitLab CI. It consolida
 
 4. **Compose Inline Discussions**  
    - For each selected finding:  
-     - Choose the precise added line.  
+     - Choose the precise added line within the affected file and record its path.  
      - Craft feedback following the inline template.  
+     - Call `create_anchored_discussion_auto` with `project_id`, `merge_request_iid`, `body`, and `file_path` set to the diff’s `new_path`.  
      - Prefer concrete code suggestions (` ```suggestion ` blocks) that can be applied directly.  
      - Reference official docs or skill references when helpful.
 
