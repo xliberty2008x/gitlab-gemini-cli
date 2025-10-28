@@ -13,7 +13,8 @@ Automation-first setup for Gemini-powered code review on GitLab Merge Requests.
   - Gemini API key ([create one](https://aistudio.google.com/app/apikey))
   - GitLab personal access token with the `api` scope
 - [ ] **Verify runner availability**
-  - Ensure a GitLab Runner is online with the `ai` tag that can execute Node.js 20+ jobs
+  - Ensure a GitLab Runner is online with the `ai` label (the Runner UI may still call it a "tag") that can execute Node.js 20+ jobs
+  - The CI jobs in this toolkit explicitly request the `ai` label; without it, merge-request pipelines remain stuck in the "pending" state
 - [ ] **Set CI/CD variables**
   - In **Settings → CI/CD → Variables**, add:
 
@@ -113,7 +114,7 @@ The installer automatically handles URL configuration in all files.
 
 | Issue | Solution |
 |-------|----------|
-| Job stuck "pending" | Runner missing or no `ai` tag configured |
+| Job stuck "pending" | Runner missing or no `ai` label configured |
 | "gemini: not found" | Runner needs Node 20+ or `node:20-alpine` image |
 | "GEMINI_API_KEY is not set" | Check variable exists; uncheck "Protected" for testing |
 | "401 Unauthorized" | Verify `GITLAB_REVIEW_PAT` is valid with `api` scope |
