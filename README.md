@@ -49,7 +49,7 @@ Automation-first setup for Gemini-powered code review on GitLab Merge Requests.
   git push origin test-gemini-review
   ```
 
-The `.skils/` directory contains the Gemini reviewer bundle. Adjust `.skils/gitlab-mr-reviewer/SKILL.md` and the `references/` notes to match your review standards.
+Before clicking **Create merge request**, open the Merge Request form's right-hand sidebar and choose the **`ai`** label from the **Labels** widget so the CI jobs pick the correct runner. After you create the MR, that same label remains visible in the sidebar, matching the GitLab UI screenshot provided in the setup guide. The `.skils/` directory contains the Gemini reviewer bundle. Adjust `.skils/gitlab-mr-reviewer/SKILL.md` and the `references/` notes to match your review standards.
 
 ## ❓ FAQ
 
