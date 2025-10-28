@@ -1,163 +1,55 @@
 # GitLab Gemini CLI
 
-> Automated AI-powered code review for GitLab Merge Requests using Google's Gemini and Model Context Protocol (MCP)
+Automation-first setup for Gemini-powered code review on GitLab Merge Requests.
 
 [![npm version](https://img.shields.io/npm/v/gitlab-gemini-cli.svg)](https://www.npmjs.com/package/gitlab-gemini-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ What You Get
+## Installation Checklist
 
-After installation, every Merge Request automatically receives:
-- ✅ Up to 5 inline code review comments on specific lines
-- ✅ 1 comprehensive summary review note
-- ✅ Severity indicators (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low)
-- ✅ AI-powered issue triage and labeling
-- ✅ Manual AI invocation for custom tasks
+- [ ] **Confirm prerequisites**
+  - GitLab project with Maintainer access (gitlab.com or self-managed)
+  - Node.js 16 or later available locally
+  - Gemini API key ([create one](https://aistudio.google.com/app/apikey))
+  - GitLab personal access token with the `api` scope
+- [ ] **Verify runner availability**
+  - Ensure a GitLab Runner is online with the `ai` label (the Runner UI may still call it a "tag") that can execute Node.js 20+ jobs
+  - The CI jobs in this toolkit explicitly request the `ai` label; without it, merge-request pipelines remain stuck in the "pending" state
+- [ ] **Set CI/CD variables**
+  - In **Settings → CI/CD → Variables**, add:
 
-## 📋 Prerequisites
+    | Variable | Value | Flags |
+    |----------|-------|-------|
+    | `GEMINI_API_KEY` | Gemini API key (`AIza...`) | ✅ Masked, ❌ Protected* |
+    | `GITLAB_REVIEW_PAT` | GitLab token (`glpat-...`) | ✅ Masked, ❌ Protected* |
 
-- GitLab project with Maintainer access (gitlab.com or self-hosted)
-- GitLab Runner with tag: `ai`
-- Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
-- GitLab Personal Access Token with `api` scope
-- Node.js 16+ installed locally
+    *Temporarily unprotect while testing on non-protected branches.
+- [ ] **Initialize the project**
 
-## 🚀 Quick Start
+  ```bash
+  # From the root of your GitLab project
+  npx gitlab-gemini-cli init
+  ```
 
-### One-Command Setup
+- [ ] **Review and commit generated files**
 
-```bash
-# In your GitLab project directory
-npx gitlab-gemini-cli init
-```
+  ```bash
+  git add .gitlab-ci.yml .gitlab/ .skils/ .gitlab-gemini-cli.json gitlab-mcp-server.js package.json package-lock.json
+  git commit -m "Add Gemini AI code review"
+  git push
+  ```
 
-That's it! The installer will:
-1. Ask for your GitLab instance type (gitlab.com or self-hosted)
-2. Optionally validate your GitLab connection
-3. Create `.gitlab-ci.yml` and `.gitlab/` workflow files
-4. Configure `gitlab-mcp-server.js` with your GitLab URL
-5. Install runtime dependencies (`@modelcontextprotocol/sdk`, `node-fetch`)
+- [ ] **Create a test merge request** (optional but recommended)
 
-> **Note:** `gitlab-gemini-cli` is just a setup tool. You don't need to keep it installed after setup - your CI jobs will work automatically!
+  ```bash
+  git checkout -b test-gemini-review
+  echo "console.log('Hello Gemini');" > test.js
+  git add test.js
+  git commit -m "Test: AI review"
+  git push origin test-gemini-review
+  ```
 
-### Configuration
-
-**Set CI/CD Variables** in GitLab → **Settings → CI/CD → Variables**:
-
-| Variable | Value | Flags |
-|----------|-------|-------|
-| `GEMINI_API_KEY` | Your Gemini API key (`AIza...`) | ✅ Masked, ❌ Protected |
-| `GITLAB_REVIEW_PAT` | Your GitLab token (`glpat-...`) | ✅ Masked, ❌ Protected |
-
-> **Note:** Uncheck "Protected" for testing on non-protected branches. Re-enable for production.
-
-### Commit and Test
-
-```bash
-# Commit the changes (the installer generates .skils/, .gitlab-gemini-cli.json, and lockfiles)
-git add .gitlab-ci.yml .gitlab/ .skils/ .gitlab-gemini-cli.json gitlab-mcp-server.js package.json package-lock.json
-git commit -m "Add Gemini AI code review"
-git push
-
-# Create a test MR
-git checkout -b test-gemini-review
-echo "console.log('Hello Gemini');" > test.js
-git add test.js
-git commit -m "Test: AI review"
-git push origin test-gemini-review
-```
-
-Then create a Merge Request in GitLab and watch the AI review in action! 🎉
-
-> **What is `.skils/`?** It's the Gemini reviewer "skill bundle" that sets tone, scope, and reference material. Customize it by editing `.skils/gitlab-mr-reviewer/SKILL.md` to match your review guidelines and updating the `.skils/gitlab-mr-reviewer/references/` notes with project-specific best practices.
-
-## 🏗️ Architecture
-
-This project uses a **modular CI/CD architecture** with:
-
-### `.gitlab-ci.yml` (Router)
-A simple file that includes workflow modules from `.gitlab/` directory:
-```yaml
-stages:
-  - dispatch
-  - review
-  - triage
-
-include:
-  - local: '.gitlab/merge-request-review.yml'
-  - local: '.gitlab/issue-triage.yml'
-  - local: '.gitlab/manual-invoke.yml'
-```
-
-### `.gitlab/` Directory (Workflows)
-- **`merge-request-review.yml`** - Automatic code review on every MR
-- **`issue-triage.yml`** - AI-powered issue labeling (webhook/scheduled)
-- **`manual-invoke.yml`** - On-demand AI tasks (manual trigger)
-
-### `.skils/` Directory (Reviewer Skill)
-- **`gitlab-mr-reviewer/SKILL.md`** - Canonical rulebook Gemini loads before reviewing
-- **`gitlab-mr-reviewer/references/`** - Unity performance, Addressables, and Zenject reference notes cited in reviews
-
-### `gitlab-mcp-server.js` (MCP Server)
-Node.js server that exposes 20+ GitLab API operations as standardized MCP tools for AI agents.
-
-## 📚 Features
-
-### 🤖 Automatic Code Review
-Every merge request gets reviewed automatically:
-- Comments only on changed lines
-- Up to 5 inline issues + 1 summary note
-- Smart line anchoring with fallback
-- Respects `.gitignore` patterns
-- Loads the `gitlab-mr-reviewer` skill package to enforce GitLab + Unity review rules
-
-### 🏷️ Issue Triage
-Automated issue labeling (requires webhook setup):
-- Analyzes issue title and description
-- Suggests relevant labels from project
-- Posts explanation comment
-- Scheduled batch processing available
-
-### ⚡ Manual Invocation
-Run custom AI tasks on-demand:
-- Trigger manually from GitLab UI
-- Provide custom prompts via `CUSTOM_PROMPT` variable
-- Full access to GitLab MCP tools
-- Examples: summarize MRs, audit security, analyze trends
-
-### 📝 Observability
-- Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Default is `debug`, and sensitive fields such as file contents and note bodies are automatically redacted.
-- Gemini CLI runs with `--debug` and `DEBUG` env vars; telemetry is written to `gemini-telemetry.log` which is printed at the end of each job. The log is cleared before each run to avoid repeat entries.
-- Make sure `gettext` is available (jobs install it automatically) because `envsubst` is required to render prompts.
-- Gemini CLI runs with `--debug` and telemetry logging enabled (see pipelines for `gemini-telemetry.log` output).
-
-## 🔧 CLI Commands
-
-### `init`
-Initialize GitLab Gemini CLI in your project:
-```bash
-npx gitlab-gemini-cli init
-
-# With options
-npx gitlab-gemini-cli init --gitlab-url https://gitlab.example.com
-npx gitlab-gemini-cli init --yes  # Skip prompts, use defaults
-npx gitlab-gemini-cli init --force  # Overwrite existing files
-```
-
-### `validate`
-Validate GitLab connection and credentials:
-```bash
-npx gitlab-gemini-cli validate --gitlab-url https://gitlab.com --token glpat-xxx
-```
-
-### `update`
-Update existing installation to latest version:
-```bash
-npx gitlab-gemini-cli update
-
-# Change GitLab URL
-npx gitlab-gemini-cli update --gitlab-url https://new-gitlab.com
-```
+The `.skils/` directory contains the Gemini reviewer bundle. Adjust `.skils/gitlab-mr-reviewer/SKILL.md` and the `references/` notes to match your review standards.
 
 ## ❓ FAQ
 
@@ -222,7 +114,7 @@ The installer automatically handles URL configuration in all files.
 
 | Issue | Solution |
 |-------|----------|
-| Job stuck "pending" | Runner missing or no `ai` tag configured |
+| Job stuck "pending" | Runner missing or no `ai` label configured |
 | "gemini: not found" | Runner needs Node 20+ or `node:20-alpine` image |
 | "GEMINI_API_KEY is not set" | Check variable exists; uncheck "Protected" for testing |
 | "401 Unauthorized" | Verify `GITLAB_REVIEW_PAT` is valid with `api` scope |
@@ -230,50 +122,54 @@ The installer automatically handles URL configuration in all files.
 | No comments posted | Normal if no issues found; check job logs |
 
 
-## 🛠️ Development
+## Further Reference
 
-### Local Testing
+### Architecture
+
+The project ships modular CI/CD components:
+
+- `.gitlab-ci.yml` acts as a router that includes the workflows in `.gitlab/`.
+- `.gitlab/merge-request-review.yml`, `.gitlab/issue-triage.yml`, and `.gitlab/manual-invoke.yml` define review, triage, and manual jobs.
+- `.skils/gitlab-mr-reviewer/` provides the reviewer skill bundle consumed by Gemini before each run.
+- `gitlab-mcp-server.js` exposes GitLab API operations through the Model Context Protocol.
+
+### Features
+
+- Automated code review with inline comments and a summary note per merge request.
+- Severity labeling for findings (Critical, High, Medium, Low).
+- Issue triage workflow for labeling issues via webhook or schedule.
+- Manual invocation job for custom prompts routed through the MCP server.
+- Detailed logging via `GITLAB_MCP_LOG_LEVEL` and `gemini-telemetry.log`.
+
+### CLI Commands
+
+- `npx gitlab-gemini-cli init` — bootstrap files and configuration.
+- `npx gitlab-gemini-cli validate` — confirm connectivity and credentials.
+- `npx gitlab-gemini-cli update` — regenerate workflows with the latest defaults.
+
+### Development
+
+Clone the repository, install dependencies, and run the MCP server locally for testing:
 
 ```bash
-# Clone repository
 git clone https://github.com/xliberty2008x/gitlab-gemini-cli.git
 cd gitlab-gemini-cli
-
-# Install dependencies
 npm install
-
-# Test MCP server
 export GITLAB_PERSONAL_ACCESS_TOKEN="glpat-xxx"
 export GITLAB_API_URL="https://gitlab.com/api/v4"
 npm run mcp:serve
 ```
 
-### Publishing
+### License
 
-```bash
-# Update version
-npm version patch  # or minor, major
+Released under the [MIT License](LICENSE).
 
-# Publish to npm
-npm publish
-```
+### Contributing
 
-## 📄 License
+Issues and pull requests are welcome.
 
-MIT License - see [LICENSE](LICENSE) file
+### Acknowledgments
 
-## 🤝 Contributing
-
-Contributions welcome! Please open an issue or PR.
-
-## 🙏 Acknowledgments
-
-Built with:
-- [Google Gemini](https://ai.google.dev/) - AI model
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Tool standardization
-- [GitLab CI/CD](https://docs.gitlab.com/ee/ci/) - Automation platform
-
----
-
-**Setup Time:** 5-10 minutes
-**Maintenance:** Zero - runs automatically on every MR
+- [Google Gemini](https://ai.google.dev/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)
