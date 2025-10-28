@@ -54,8 +54,8 @@ That's it! The installer will:
 ### Commit and Test
 
 ```bash
-# Commit the changes
-git add .gitlab-ci.yml .gitlab/ gitlab-mcp-server.js package.json
+# Commit the changes (the installer generates .skils/, .gitlab-gemini-cli.json, and lockfiles)
+git add .gitlab-ci.yml .gitlab/ .skils/ .gitlab-gemini-cli.json gitlab-mcp-server.js package.json package-lock.json
 git commit -m "Add Gemini AI code review"
 git push
 
@@ -68,6 +68,8 @@ git push origin test-gemini-review
 ```
 
 Then create a Merge Request in GitLab and watch the AI review in action! 🎉
+
+> **What is `.skils/`?** It's the Gemini reviewer "skill bundle" that sets tone, scope, and reference material. Customize it by editing `.skils/gitlab-mr-reviewer/SKILL.md` to match your review guidelines and updating the `.skils/gitlab-mr-reviewer/references/` notes with project-specific best practices.
 
 ## 🏗️ Architecture
 
