@@ -124,6 +124,8 @@ The installer automatically handles URL configuration in all files.
 
 ## Further Reference
 
+For detailed shared runner provisioning steps, see [`SYSADMIN.md`](SYSADMIN.md).
+
 ### Architecture
 
 The project ships modular CI/CD components:
