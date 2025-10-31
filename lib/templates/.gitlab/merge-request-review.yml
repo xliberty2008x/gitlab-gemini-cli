@@ -38,7 +38,7 @@ gemini_cli_code_review:
             "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
             "env": {
               "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
-              "GITLAB_API_URL": "https://gitlab.example.com/api/v4",
+              "GITLAB_API_URL": "${CI_API_V4_URL:-https://gitlab.example.com/api/v4}",
               "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
             },
             "timeout": 10000,
@@ -50,6 +50,7 @@ gemini_cli_code_review:
             "includeTools": [
               "discussion_add_note",
               "discussion_list",
+              "update_note",
               "create_anchored_discussion_auto",
               "get_merge_request_changes",
               "get_merge_request_commits",
@@ -63,6 +64,20 @@ gemini_cli_code_review:
         }
       }
       EOF
+    - |
+      # Prefetch merge request discussions to avoid duplicate feedback
+      CONTEXT_LOG="${CI_PROJECT_DIR}/mr-context.log"
+      if output="$(node "${CI_PROJECT_DIR}/.gitlab/build-mr-context.js" 2>"${CONTEXT_LOG}")"; then
+        eval "$output"
+      else
+        echo "Warning: Failed to build MR context; continuing without it." >&2
+        if [ -s "${CONTEXT_LOG}" ]; then
+          echo "--- MR Context Error ---" >&2
+          cat "${CONTEXT_LOG}" >&2
+        fi
+      fi
+      : "${EXISTING_FEEDBACK_CONTEXT:=Existing discussions unavailable.}"
+      : "${IGNORED_DISCUSSIONS:=[]}"
     - |
       # Run Gemini code review
       rm -f "${CI_PROJECT_DIR}/gemini-telemetry.log"
@@ -82,6 +97,7 @@ gemini_cli_code_review:
         - Interact with GitLab only through the MCP tools provided by this job. Do not print review feedback to stdout.
         - Prefer `create_anchored_discussion_auto` for inline findings; use explicit positioning only if anchoring fails.
         - Respect the five-comment budget and severity rules defined in the skill.
+        - When refining an existing finding, call `update_note` instead of opening a new discussion.
         - Finish by posting the required summary note via `discussion_add_note`, reporting any tool failures or blockers encountered.
 
         ## GitLab Context
@@ -91,6 +107,19 @@ gemini_cli_code_review:
         - Merge Request IID: ${CI_MERGE_REQUEST_IID}
         - Target Branch: ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}
         - Source Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+
+        ## Step 0: Existing Discussions Check
+
+        - Review the list below before raising any new findings. It captures the latest state of each discussion on this merge request.
+        - Threads flagged as `ignored` were explicitly waived by a human and must remain untouched.
+        - Existing discussions (read-only):
+
+        ${EXISTING_FEEDBACK_CONTEXT}
+
+        - `IGNORED_DISCUSSIONS` (JSON array): ${IGNORED_DISCUSSIONS}
+        - When a previously reported issue is still valid, call `update_note` to revise your earlier comment rather than opening a new discussion.
+        - If the code changed or the issue is resolved, note that in the existing thread.
+        - You **MUST NOT** reopen or restate findings for any discussion ID listed in `IGNORED_DISCUSSIONS`.
 
       PROMPT
       export DEBUG=1 DEBUG_MODE=1 LOG_LEVEL=debug

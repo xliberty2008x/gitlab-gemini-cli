@@ -51,6 +51,97 @@ Automation-first setup for Gemini-powered code review on GitLab Merge Requests.
 
 Before clicking **Create merge request**, open the Merge Request form's right-hand sidebar and choose the **`ai`** label from the **Labels** widget so the CI jobs pick the correct runner. After you create the MR, that same label remains visible in the sidebar, matching the GitLab UI screenshot provided in the setup guide. The `.skils/` directory contains the Gemini reviewer bundle. Adjust `.skils/gitlab-mr-reviewer/SKILL.md` and the `references/` notes to match your review standards.
 
+This project uses a **modular CI/CD architecture** with:
+
+### `.gitlab-ci.yml` (Router)
+A simple file that includes workflow modules from `.gitlab/` directory:
+```yaml
+stages:
+  - dispatch
+  - review
+  - triage
+
+include:
+  - local: '.gitlab/merge-request-review.yml'
+  - local: '.gitlab/issue-triage.yml'
+  - local: '.gitlab/manual-invoke.yml'
+```
+
+### `.gitlab/` Directory (Workflows)
+- **`merge-request-review.yml`** - Automatic code review on every MR
+- **`issue-triage.yml`** - AI-powered issue labeling (webhook/scheduled)
+- **`manual-invoke.yml`** - On-demand AI tasks (manual trigger)
+
+### `.skils/` Directory (Reviewer Skill)
+- **`gitlab-mr-reviewer/SKILL.md`** - Canonical rulebook Gemini loads before reviewing
+- **`gitlab-mr-reviewer/references/`** - Unity performance, Addressables, and Zenject reference notes cited in reviews
+
+### `gitlab-mcp-server.js` (MCP Server)
+Node.js server that exposes 20+ GitLab API operations as standardized MCP tools for AI agents.
+
+## 📚 Features
+
+### 🤖 Automatic Code Review
+Every merge request gets reviewed automatically:
+- Comments only on changed lines
+- Up to 5 inline issues + 1 summary note
+- Smart line anchoring with fallback
+- Respects `.gitignore` patterns
+- Loads the `gitlab-mr-reviewer` skill package to enforce GitLab + Unity review rules
+
+#### Duplicate Protection
+- The review job preloads existing discussions before Gemini starts, so the agent updates prior findings instead of reopening them.
+- Explicit ignore markers let humans suppress intentional findings. Reply to the discussion with one of the following tokens on its own line: `@gemini ignore`, `/gemini ignore`, or `<!-- gemini-ignore -->`.
+- When Gemini revisits a valid finding, it now calls `update_note` to edit the original thread rather than creating a duplicate comment.
+
+### 🏷️ Issue Triage
+Automated issue labeling (requires webhook setup):
+- Analyzes issue title and description
+- Suggests relevant labels from project
+- Posts explanation comment
+- Scheduled batch processing available
+
+### ⚡ Manual Invocation
+Run custom AI tasks on-demand:
+- Trigger manually from GitLab UI
+- Provide custom prompts via `CUSTOM_PROMPT` variable
+- Full access to GitLab MCP tools
+- Examples: summarize MRs, audit security, analyze trends
+
+### 📝 Observability
+- Set `GITLAB_MCP_LOG_LEVEL` (`error`, `warn`, `info`, `debug`) to mirror every MCP tool request/response in CI logs. Default is `debug`, and sensitive fields such as file contents and note bodies are automatically redacted.
+- Gemini CLI runs with `--debug` and `DEBUG` env vars; telemetry is written to `gemini-telemetry.log` which is printed at the end of each job. The log is cleared before each run to avoid repeat entries.
+- Make sure `gettext` is available (jobs install it automatically) because `envsubst` is required to render prompts.
+- Gemini CLI runs with `--debug` and telemetry logging enabled (see pipelines for `gemini-telemetry.log` output).
+
+## 🔧 CLI Commands
+
+### `init`
+Initialize GitLab Gemini CLI in your project:
+```bash
+npx gitlab-gemini-cli init
+
+# With options
+npx gitlab-gemini-cli init --gitlab-url https://gitlab.example.com
+npx gitlab-gemini-cli init --yes  # Skip prompts, use defaults
+npx gitlab-gemini-cli init --force  # Overwrite existing files
+```
+
+### `validate`
+Validate GitLab connection and credentials:
+```bash
+npx gitlab-gemini-cli validate --gitlab-url https://gitlab.com --token glpat-xxx
+```
+
+### `update`
+Update existing installation to latest version:
+```bash
+npx gitlab-gemini-cli update
+
+# Change GitLab URL
+npx gitlab-gemini-cli update --gitlab-url https://new-gitlab.com
+```
+
 ## ❓ FAQ
 
 ### Do I need to keep `gitlab-gemini-cli` in my dependencies?

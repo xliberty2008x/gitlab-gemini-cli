@@ -8,7 +8,7 @@ gemini_cli_code_review:
     - ai
   resource_group: "gemini-review-$CI_MERGE_REQUEST_IID"
   before_script:
-    - apk add --no-cache bash ca-certificates curl
+    - apk add --no-cache bash ca-certificates curl gettext
     - npm install -g @google/gemini-cli@latest
     - gemini --version
     - npm install --omit=dev
@@ -38,13 +38,14 @@ gemini_cli_code_review:
             "args": ["${CI_PROJECT_DIR}/gitlab-mcp-server.js"],
             "env": {
               "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_REVIEW_PAT}",
-              "GITLAB_API_URL": "https://gitlab.example.com/api/v4",
+              "GITLAB_API_URL": "${CI_API_V4_URL:-https://gitlab.example.com/api/v4}",
               "GITLAB_TOKEN_HEADER": "PRIVATE-TOKEN"
             },
             "timeout": 10000,
             "includeTools": [
               "discussion_add_note",
               "discussion_list",
+              "update_note",
               "create_anchored_discussion_auto",
               "get_merge_request_changes",
               "get_merge_request_commits",
@@ -59,6 +60,20 @@ gemini_cli_code_review:
         }
       }
       EOF
+    - |
+      # Prefetch merge request discussions to avoid duplicate feedback
+      CONTEXT_LOG="${CI_PROJECT_DIR}/mr-context.log"
+      if output="$(node "${CI_PROJECT_DIR}/.gitlab/build-mr-context.js" 2>"${CONTEXT_LOG}")"; then
+        eval "$output"
+      else
+        echo "Warning: Failed to build MR context; continuing without it." >&2
+        if [ -s "${CONTEXT_LOG}" ]; then
+          echo "--- MR Context Error ---" >&2
+          cat "${CONTEXT_LOG}" >&2
+        fi
+      fi
+      : "${EXISTING_FEEDBACK_CONTEXT:=Existing discussions unavailable.}"
+      : "${IGNORED_DISCUSSIONS:=[]}"
     - |
       # Run Gemini code review
       cat > "${CI_PROJECT_DIR}/prompt.tmpl" <<'PROMPT'
@@ -101,11 +116,24 @@ gemini_cli_code_review:
         - Use \`get_merge_request\` to get the title, body, and metadata about the merge request.
         - Use \`get_merge_request_changes\` or \`list_merge_request_diffs\` to get the diff from the merge request.
 
+        ## Step 0: Existing Discussions Check
+
+        - Review the list below before raising any new findings. It captures the latest state of each discussion on this merge request.
+        - Threads flagged as `ignored` were explicitly waived by a human and must remain untouched.
+        - Existing discussions (read-only):
+
+        ${EXISTING_FEEDBACK_CONTEXT}
+
+        - `IGNORED_DISCUSSIONS` (JSON array): ${IGNORED_DISCUSSIONS}
+        - When a previously reported issue is still valid, call `update_note` to revise your earlier comment rather than opening a new discussion.
+        - If the code changed or the issue is resolved, note that in the existing thread.
+        - You **MUST NOT** reopen or restate findings for any discussion ID listed in `IGNORED_DISCUSSIONS`.
+
         -----
 
         ## Execution Workflow
 
-        Follow this three-step process sequentially.
+        Follow this workflow sequentially, starting from Step 0.
 
         ### Step 1: Data Gathering and Analysis
 
@@ -151,6 +179,7 @@ gemini_cli_code_review:
         - **Suggestion Validity:** All code in a suggestion block **MUST** be syntactically correct and ready to be applied directly.
 
         - **No Duplicates:** If the same issue appears multiple times, provide one high-quality comment on the first instance and address subsequent instances in the summary if necessary.
+        - **Update Existing Threads:** When refining the same finding, call `update_note` on your earlier discussion instead of creating a new one.
 
         - **Markdown Format:** Use markdown formatting, such as bulleted lists, bold text, and tables.
 

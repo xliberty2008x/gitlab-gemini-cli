@@ -1,13 +1,14 @@
 {
   "name": "gitlab-gemini-cli",
-  "version": "1.1.13",
+  "version": "1.1.14",
   "description": "Automated AI-powered code review for GitLab using Google Gemini and Model Context Protocol",
   "main": "lib/installer.js",
   "bin": {
     "gitlab-gemini-cli": "./bin/cli.js"
   },
   "scripts": {
-    "mcp:serve": "node gitlab-mcp-server.js"
+    "mcp:serve": "node gitlab-mcp-server.js",
+    "test": "node --test \"lib/__tests__/**/*.test.js\""
   },
   "keywords": [
     "gitlab",
@@ -40,12 +41,12 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.4.0",
-    "node-fetch": "^2.6.11",
-    "commander": "^11.1.0",
     "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "docx": "^9.5.1",
+    "node-fetch": "^2.6.11",
     "prompts": "^2.4.2"
   },
-  "devDependencies": {},
   "publishConfig": {
     "access": "public"
   }
