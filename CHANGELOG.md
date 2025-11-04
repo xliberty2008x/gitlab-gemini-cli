@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.18
+- Fixed ignore-marker regression: MCP server now short-circuits `create_anchored_discussion_auto` when a matching discussion is listed in `IGNORED_DISCUSSIONS`, preventing duplicate threads.
+- Added reusable-note selector helper and unit tests covering ignored vs active discussions.
+
 ## 1.1.17
 - Localised reviewer output: the skill, prompts, and QA playbook now require Gemini to deliver inline comments and summaries українською мовою.
 - Updated documentation to reflect the Ukrainian response policy for automatic reviews.
