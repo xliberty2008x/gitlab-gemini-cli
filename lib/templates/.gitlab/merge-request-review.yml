@@ -97,6 +97,7 @@ gemini_cli_code_review:
         - Interact with GitLab only through the MCP tools provided by this job. Do not print review feedback to stdout.
         - Prefer `create_anchored_discussion_auto` for inline findings; use explicit positioning only if anchoring fails.
         - Respect the five-comment budget and severity rules defined in the skill.
+        - Формулюй усі інлайн-коментарі та підсумкові нотатки українською мовою.
         - When refining an existing finding, call `update_note` instead of opening a new discussion.
         - Finish by posting the required summary note via `discussion_add_note`, reporting any tool failures or blockers encountered.
 
@@ -118,7 +119,7 @@ gemini_cli_code_review:
 
         - `IGNORED_DISCUSSIONS` (JSON array): ${IGNORED_DISCUSSIONS}
         - When a previously reported issue is still valid, call `update_note` to revise your earlier comment rather than opening a new discussion.
-        - If the code changed or the issue is resolved, note that in the existing thread.
+        - If the code changed or the issue is resolved, note that in the existing thread, зберігаючи українську мову спілкування.
         - You **MUST NOT** reopen or restate findings for any discussion ID listed in `IGNORED_DISCUSSIONS`.
 
       PROMPT

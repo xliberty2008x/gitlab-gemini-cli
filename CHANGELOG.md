@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.17
+- Localised reviewer output: the skill, prompts, and QA playbook now require Gemini to deliver inline comments and summaries українською мовою.
+- Updated documentation to reflect the Ukrainian response policy for automatic reviews.
+
 ## 1.1.16
 - Enforce ignore markers server-side so `create_anchored_discussion_auto` skips both updates and new posts when a discussion is flagged with `@gemini ignore` (or variants).
 - Parse `IGNORED_DISCUSSIONS` safely, share helpers between runtime/template, and add regression tests for the ignore path.

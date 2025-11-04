@@ -88,6 +88,7 @@ Every merge request gets reviewed automatically:
 - Smart line anchoring with fallback
 - Respects `.gitignore` patterns
 - Loads the `gitlab-mr-reviewer` skill package to enforce GitLab + Unity review rules
+- Результати (інлайн-коментарі та підсумкова нотатка) генеруються українською мовою за замовчуванням.
 
 #### Duplicate Protection
 - The review job preloads existing discussions before Gemini starts, so the agent updates prior findings instead of reopening them.
