@@ -9,7 +9,7 @@ const GITLAB_API_URL = process.env.GITLAB_API_URL || "https://gitlab.example.com
 const GITLAB_TOKEN = process.env.GITLAB_PERSONAL_ACCESS_TOKEN;
 const GITLAB_TOKEN_HEADER = process.env.GITLAB_TOKEN_HEADER || "Authorization"; // "JOB-TOKEN", "PRIVATE-TOKEN", or "Authorization"
 
-if (!GITLAB_TOKEN) {
+if (!GITLAB_TOKEN && require.main === module) {
   console.error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is required");
   process.exit(1);
 }
@@ -28,6 +28,9 @@ const server = new Server(
 
 // Helper function to make GitLab API calls
 async function gitlabApi(endpoint, options = {}) {
+  if (!GITLAB_TOKEN) {
+    throw new Error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is required");
+  }
   const url = `${GITLAB_API_URL}${endpoint}`;
   const authHeaders = (() => {
     if (GITLAB_TOKEN_HEADER === "JOB-TOKEN") return { "JOB-TOKEN": GITLAB_TOKEN };
@@ -61,6 +64,8 @@ const CURRENT_LOG_LEVEL =
   LOG_LEVELS[resolvedLogLevelName] !== undefined
     ? LOG_LEVELS[resolvedLogLevelName]
     : LOG_LEVELS.info;
+
+let cachedCurrentUser = null;
 
 function log(level, message, details) {
   const target = LOG_LEVELS[level];
@@ -144,6 +149,97 @@ function logToolResponse(name, result) {
 
 function logToolError(name, error) {
   log("error", `Tool call failed: ${name}`, { message: error.message });
+}
+
+async function getCurrentUser() {
+  if (cachedCurrentUser !== null) {
+    return cachedCurrentUser;
+  }
+  try {
+    cachedCurrentUser = await gitlabApi(`/user`);
+  } catch (error) {
+    log("warn", "Failed to resolve current GitLab user", { message: error.message });
+    cachedCurrentUser = null;
+  }
+  return cachedCurrentUser;
+}
+
+function normalizeIssueSignature(body) {
+  if (!body || typeof body !== "string") {
+    return null;
+  }
+  const firstContentLine = body
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  if (!firstContentLine) {
+    return null;
+  }
+  return firstContentLine.replace(/\s+/g, " ").toLowerCase();
+}
+
+function positionsMatch(a = {}, b = {}) {
+  const pathA = a.new_path || a.old_path;
+  const pathB = b.new_path || b.old_path;
+  if (!pathA || !pathB || pathA !== pathB) {
+    return false;
+  }
+  const lineA =
+    typeof a.new_line === "number"
+      ? a.new_line
+      : typeof a.old_line === "number"
+      ? a.old_line
+      : null;
+  const lineB =
+    typeof b.new_line === "number"
+      ? b.new_line
+      : typeof b.old_line === "number"
+      ? b.old_line
+      : null;
+  if (lineA === null || lineB === null) {
+    return false;
+  }
+  return lineA === lineB;
+}
+
+async function findReusableNote(projectId, mergeRequestIid, position, body) {
+  const signature = normalizeIssueSignature(body);
+  if (!signature || !position) {
+    return null;
+  }
+
+  try {
+    const [currentUser, discussions] = await Promise.all([
+      getCurrentUser(),
+      gitlabApi(
+        `/projects/${encodeURIComponent(
+          projectId
+        )}/merge_requests/${encodeURIComponent(mergeRequestIid)}/discussions`
+      ),
+    ]);
+
+    for (const discussion of discussions || []) {
+      for (const note of discussion.notes || []) {
+        if (!note || note.system || !note.position) {
+          continue;
+        }
+        if (!positionsMatch(note.position, position)) {
+          continue;
+        }
+        if (currentUser?.id && note.author?.id && note.author.id !== currentUser.id) {
+          continue;
+        }
+        if (normalizeIssueSignature(note.body) !== signature) {
+          continue;
+        }
+        return { discussionId: discussion.id, noteId: note.id };
+      }
+    }
+  } catch (error) {
+    log("warn", "Unable to inspect existing discussions for reuse", { message: error.message });
+  }
+
+  return null;
 }
 
 // List all available tools
@@ -868,6 +964,55 @@ async function executeTool(name, args) {
           }
 
           const payload = { body: args.body, position };
+          const reuseCandidate = await findReusableNote(
+            args.project_id,
+            args.merge_request_iid,
+            position,
+            args.body
+          );
+
+          if (reuseCandidate) {
+            try {
+              const updated = await gitlabApi(
+                `/projects/${encodeURIComponent(
+                  args.project_id
+                )}/merge_requests/${encodeURIComponent(
+                  args.merge_request_iid
+                )}/notes/${reuseCandidate.noteId}`,
+                {
+                  method: 'PUT',
+                  body: JSON.stringify({ body: args.body }),
+                }
+              );
+              log("info", "Updated existing discussion via update_note", {
+                discussionId: reuseCandidate.discussionId,
+                noteId: reuseCandidate.noteId,
+              });
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        action: 'update_note',
+                        discussion_id: reuseCandidate.discussionId,
+                        note: updated,
+                      },
+                      null,
+                      2
+                    ),
+                  },
+                ],
+              };
+            } catch (updateError) {
+              log("warn", "Failed to update existing note; falling back to new discussion", {
+                discussionId: reuseCandidate.discussionId,
+                noteId: reuseCandidate.noteId,
+                message: updateError.message,
+              });
+            }
+          }
+
           const created = await gitlabApi(`/projects/${encodeURIComponent(args.project_id)}/merge_requests/${args.merge_request_iid}/discussions`, {
             method: 'POST',
             body: JSON.stringify(payload),
@@ -928,7 +1073,17 @@ async function main() {
   console.error("Enhanced GitLab MCP server running on stdio");
 }
 
-main().catch((error) => {
-  console.error("Server error:", error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error("Server error:", error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  server,
+  executeTool,
+  normalizeIssueSignature,
+  positionsMatch,
+  findReusableNote,
+};
