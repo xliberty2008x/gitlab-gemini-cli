@@ -37,6 +37,19 @@ If duplication occurs, collect the full telemetry (`gemini-telemetry.log`) and f
 
 ---
 
+## 1a. Scenario: Description Edit Does **Not** Trigger a Run
+
+**Goal:** Ensure metadata-only MR changes (description, labels) no longer start the review job.
+
+1. After Scenario 1, ask the user to edit the MR description (or toggle a label) without pushing new commits.
+2. Observe GitLab Pipelines:
+   - Preferred outcome: no new pipeline appears because the workflow rules filtered it out.
+   - Acceptable fallback: pipeline exists but the `gemini_cli_code_review` job shows status **skipped** with reason “rules did not match.”
+3. Collect evidence (pipeline list screenshot or job status snippet) proving the agent did not run.
+4. If the job runs anyway, stop testing, capture the full job log, and raise a regression bug.
+
+---
+
 ## 2. Scenario: Respect Ignore Marker
 
 **Goal:** Verify that ignore tokens prevent Gemini from re-raising a known false positive.

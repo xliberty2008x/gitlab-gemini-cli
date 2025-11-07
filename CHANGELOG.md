@@ -1,5 +1,11 @@
 # Changelog
 
+# Changelog
+
+## 1.1.19
+- Tightened CI triggers so the Gemini review job only runs on MR creation, pushes that add commits, or feature-branch pushes; description/label edits no longer wake the agent.
+- Added workflow-level guard plus QA instructions (Scenario 1a) to verify metadata-only edits stay skipped.
+
 ## 1.1.18
 - Fixed ignore-marker regression: MCP server now short-circuits `create_anchored_discussion_auto` when a matching discussion is listed in `IGNORED_DISCUSSIONS`, preventing duplicate threads.
 - Added reusable-note selector helper and unit tests covering ignored vs active discussions.

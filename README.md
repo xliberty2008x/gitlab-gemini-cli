@@ -94,6 +94,7 @@ Every merge request gets reviewed automatically:
 - The review job preloads existing discussions before Gemini starts, so the agent updates prior findings instead of reopening them.
 - Explicit ignore markers let humans suppress intentional findings. Reply to the discussion with one of the following tokens on its own line: `@gemini ignore`, `/gemini ignore`, or `<!-- gemini-ignore -->`.
 - When Gemini revisits a valid finding, it now calls `update_note` to edit the original thread rather than creating a duplicate comment.
+- Pipelines only trigger on MR creation, pushes that add new commits, or direct branch pushes—editing the MR description or labels no longer wakes the agent.
 
 ### 🏷️ Issue Triage
 Automated issue labeling (requires webhook setup):

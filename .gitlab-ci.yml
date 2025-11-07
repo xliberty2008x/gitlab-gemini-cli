@@ -1,6 +1,14 @@
 # GitLab CI/CD Router Configuration
 # This file includes modular workflow files from .gitlab/ directory
 
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_request_updated" && $CI_COMMIT_SHA == $CI_COMMIT_BEFORE_SHA'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - when: never
+
 # Global stages definition
 stages:
   - dispatch    # Manual invocations

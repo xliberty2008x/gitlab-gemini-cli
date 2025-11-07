@@ -255,4 +255,10 @@ All inline findings and summary notes **must** be written in Ukrainian. Do not s
       envsubst < "${CI_PROJECT_DIR}/prompt.tmpl" | gemini --yolo
 
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_request_created"'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE == "merge_request_updated" && $CI_COMMIT_SHA != $CI_COMMIT_BEFORE_SHA'
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: never
